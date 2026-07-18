@@ -108,12 +108,12 @@ want the QR as a file/asset), fetch it from our API. **Two calls.**
 
 ### 1. Create an instance — returns your short URL + owner token
 ```
-POST https://qrkeyboard.com/i
+POST https://qrkeyboard.com/i   body: { "caps": [...], "pinRequired": true }
 → { "code": "ZFCHCX7VKPRGNEL8",
-    "joinUrl": "https://qrkeyboard.com/j/ZFCHCX7VKPRGNEL8",   ← goes in the QR
+    "joinUrl": "https://qrkeyboard.com/app#c=ZFCHCX7VKPRGNEL8",   ← goes in the QR
     "ownerToken": "…",     ← SECRET. store it. only this fetches your QR.
     "qrUrl": "https://qrkeyboard.com/i/ZFCHCX7VKPRGNEL8/qr",
-    "relay": "wss://qrkeyboard.com/s/ZFCHCX7VKPRGNEL8" }
+    "relay": "wss://qrkeyboard.com/s/ZFCHCX7VKPRGNEL8?role=device" }
 ```
 The `ownerToken` is shown once and is the **only** capability that can retrieve
 this instance's QR — keep it server-side / in device flash, never ship it to the
@@ -121,9 +121,12 @@ phone.
 
 ### 2. Fetch the QR — owner token required, your choice of format & style
 ```
-GET  /i/<code>/qr?format=svg|png|bin  &  <style params>
+GET  /i/<code>/qr?format=svg|png|bits  &  <style params>
 Header:  Authorization: Bearer <ownerToken>
 ```
+> The server-rendered QR carries only the code (no encryption key), so use it
+> with **PIN mode** (`pinRequired: true`) — the PIN establishes the key. For
+> no-PIN E2E, let the web SDK render the QR (it generates the key client-side).
 
 | `format` | Returns | Use for |
 |---|---|---|
@@ -145,9 +148,8 @@ The **`bits`** format is a plain text grid — one line per row, `'1'` = dark,
 `'0'` = light, quiet-zone border included. An MCU splits on newline and draws a
 cell per `'1'` onto its display (teletext, e-ink, OLED) with no QR library.
 
-> Short URLs: on `qrkeyboard.com` the join URL is ~41 chars → a small QR
-> (version 3, ~29 modules) that stays crisp on low-res/CRT screens. (During
-> pre-launch the workers.dev origin makes it longer.)
+> Short URLs: on `qrkeyboard.com` the join URL is ~45 chars → a small QR that
+> stays crisp on low-res / CRT screens.
 
 ## Concepts you may need (all optional)
 
@@ -192,9 +194,6 @@ for the session's lifetime. For public screens, enable rotation
 
 ---
 
-> **Status (2026-07-18):** the relay, hosted phone controller, `v1.js` web
-> helper, and end-to-end encryption are live and tested (including through a real
-> browser). Pre-launch the service runs at
-> `qrkeyboard-relay.videopaintbox.workers.dev`; it moves to `qrkeyboard.com` when
-> the domain activates. We ship no MCU firmware — you reach the API from your
-> own device code.
+> **Status:** live at **https://qrkeyboard.com** — the hosted phone controller,
+> `v1.js` web helper, end-to-end encryption, and PIN mode are all shipped and
+> tested. We ship no MCU firmware — you reach the API from your own device code.

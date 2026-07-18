@@ -5,10 +5,8 @@ scans it, their phone becomes an input device — with exactly the capabilities 
 choose (keyboard, gyro mouse, buttons, scroll) — and the input arrives in your
 code. No app for them to install; nothing to host but your own screen.
 
-> **Base URL.** Production is `https://qrkeyboard.com`. Pre-launch (until the
-> custom domain activates) it is `https://qrkeyboard-relay.videopaintbox.workers.dev`
-> — substitute that in the examples for now. WebSocket URLs use `wss://` on the
-> same host.
+> **Base URL.** `https://qrkeyboard.com` (live). WebSocket URLs use `wss://` on
+> the same host.
 
 ---
 
@@ -316,16 +314,13 @@ expiry · session id (code) is 16-char base32 (~80-bit, server-allocated).
 
 ## 12. What's live vs pending (2026-07-18)
 
-**Live & tested now:** the relay, instance creation, owner-gated QR
-(svg/png/bits), single-socket provisioning with QR push + reboot-reclaim,
-capability config flowing to `/j/<code>`, the full WebSocket handshake and
-framing, the hosted phone controller, the `v1.js` web helper, and end-to-end
-encryption (verified through a real browser). During pre-launch the service runs
-at `qrkeyboard-relay.videopaintbox.workers.dev`; it moves to `qrkeyboard.com`
-(shorter QR URLs) when the domain goes live — no code change for you.
+**Live & tested:** everything below — the relay, instance creation, owner-gated
+QR (svg/png/bits), single-socket provisioning, capability config, the full
+WebSocket handshake, the hosted phone controller, the `v1.js` web helper,
+end-to-end encryption, and PIN mode (SPAKE2) — all running at
+**https://qrkeyboard.com** and verified through a real browser.
 
-**Pending:** the custom short domain (`app.qrkeyboard.com`) and a service-worker
-offline mode. Neither changes the developer contract above.
+**Pending:** a service-worker offline mode. Does not change the contract above.
 
 **Out of scope (we do not provide):** MCU firmware, device/embedded SDKs, bridge
 firmware, prebuilt flashable binaries. You reach the API above from your own

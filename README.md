@@ -40,7 +40,5 @@ reach the API from it. We ship no device firmware or SDK beyond the optional
 
 ## Status
 
-The service is live and in pre-launch. Until the custom domain activates, use
-`https://qrkeyboard-relay.videopaintbox.workers.dev` in place of
-`https://qrkeyboard.com` (the examples note this). The developer contract does
-not change when the domain flips.
+Live at **https://qrkeyboard.com**. End-to-end encryption is always on; an
+optional PIN adds access control on a public QR. Free to start.
