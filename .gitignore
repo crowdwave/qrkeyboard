@@ -1,3 +1,6 @@
 node_modules/
 .DS_Store
 *.log
+
+# local AI guidance — not committed
+CLAUDE.md
