@@ -137,6 +137,32 @@ to the phone (via `/j/<code>`) so the controller renders exactly them.
 Offer only what you handle. A phone that scans a `["keyboard"]` instance never
 shows a pointer, and you never get `move` events.
 
+### PIN / restricted access (optional)
+
+By default anyone who can see your QR can connect — right for public screens. To
+make the QR public but **control restricted**, add a PIN:
+
+```js
+QRKeyboard.create({ el:'#qrkb', caps:['keyboard'], pin: '4271' });  // you set it
+QRKeyboard.create({ el:'#qrkb', caps:['keyboard'], pin: true });    // random → kb.pin, display it
+```
+
+- `pin: '…'` — a password you set; tell authorized users out of band (staff, a
+  printed card). Persistent.
+- `pin: true` — the SDK generates a random PIN in `kb.pin`; show it on your
+  screen for the user to type. Ephemeral, and doubles as anti-tamper (a swapped
+  QR won't match the PIN on the real screen).
+
+The user is prompted for the PIN on their phone; only the correct PIN connects.
+It's built on the **SPAKE2** protocol, so the PIN **can't be brute-forced
+offline**, and wrong guesses are limited (5 tries, then `kb.on('locked', …)`
+fires). In PIN mode the **QR carries no key** — a photographed QR is useless
+without the PIN. Think of it as WPA: the QR is the network name, the PIN is the
+password.
+
+Events: `kb.on('pinfail', e => …)` (wrong PIN, `e.attemptsLeft`) and
+`kb.on('locked', …)` (attempts exhausted).
+
 ---
 
 ## 6. Getting the QR — all the ways
@@ -239,11 +265,13 @@ credentials; single-use, time-limited join; **end-to-end encryption** (AES-256-G
 key carried only in the QR) so even we can't read the input. Capabilities are
 enforced controller-side — a phone can't send input types you didn't offer.
 
-**The one rule:** a QR is a bearer capability for its lifetime. **Don't display
-the pairing QR where it can be photographed or streamed if the input is
-confidential** (e.g. someone typing a password). For public/broadcast screens set
-`"rotate": true`, and never use qrkeyboard for OS-level/console input on a
-publicly-visible QR. Per-scenario guidance: **USE_CASES.md**.
+**The one rule:** without a PIN, a QR is a bearer capability for its lifetime —
+**don't display a no-PIN pairing QR where it can be photographed or streamed if
+the input is confidential** (e.g. someone typing a password). If a screen is both
+public *and* handles confidential/restricted input, use a **PIN** (above): the QR
+can then be as public as you like — a photo is useless without the PIN. Never use
+qrkeyboard for OS-level/console input on a publicly-visible no-PIN QR.
+Per-scenario guidance: **USE_CASES.md**.
 
 ---
 

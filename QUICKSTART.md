@@ -61,11 +61,18 @@ QRKeyboard.create({ el: '#qrkb', target: document.body });
 
 ### Pick what the phone shows (optional)
 ```js
-QRKeyboard.create({ el: '#qrkb', layout: 'keyboard' });   // keyboard only
-QRKeyboard.create({ el: '#qrkb', layout: 'pointer' });    // gyro trackpad + buttons
-QRKeyboard.create({ el: '#qrkb', layout: 'gamepad' });    // dpad + buttons
-// default: 'auto' — keyboard + pointer
+QRKeyboard.create({ el: '#qrkb', caps: ['keyboard'] });               // keyboard only
+QRKeyboard.create({ el: '#qrkb', caps: ['gyro','buttons'] });          // pointer + buttons
+// default caps: ['keyboard','gyro','buttons']
 ```
+
+### Restrict who can connect with a PIN (optional)
+```js
+QRKeyboard.create({ el: '#qrkb', pin: '4271' });  // your password (tell users out of band)
+QRKeyboard.create({ el: '#qrkb', pin: true });    // random PIN in kb.pin — show it on screen
+```
+The QR can then be fully public — only someone with the PIN can connect, and the
+PIN can't be brute-forced (SPAKE2, 5-try lockout). See the Developer Guide.
 
 ---
 
