@@ -1,44 +1,72 @@
-# qrkeyboard
+# QRKeyboard
 
-**Scan a QR code on any screen and your phone becomes its keyboard, gyro mouse,
-and buttons — no app install.** You build the screen; qrkeyboard hosts the phone
-controller, the relay, pairing, and end-to-end encryption. You get a QR and a
-stream of input events.
+**Put a QR code on your web page. Someone scans it and types on their phone.
+Your page receives the text.**
+
+Useful for a TV search box, kiosk, or presentation. You decide what the input does
+in your application. QRKeyboard supplies the QR, hosted phone page, pairing, and
+encrypted connection between the two browsers.
+
+## Try it before writing code
+
+Open the [hosted demo](https://qrkeyboard.com/#demo) on your computer. Scan the QR
+with your phone camera, connect, and type. No download or account is needed.
+The demo runs the deployed version; the simplified phone flow and new message /
+action / Finish features in this checkout are [awaiting deployment](RELEASE_STATUS.md).
+
+## Build your first version
+
+Follow the [quick start](QUICKSTART.md): copy one complete HTML file, open it,
+and scan its QR. No framework, npm package, API key, or backend setup is needed.
+The starter uses the existing live keyboard API so you can begin before the new
+service release.
+
+The integration is a script, a QR container, and an input handler:
 
 ```html
 <script src="https://qrkeyboard.com/v1.js"></script>
-<div id="qrkb"></div>
+<div id="qr"></div>
+<pre id="text"></pre>
 <script>
-  const kb = QRKeyboard.create({ el: '#qrkb', caps: ['keyboard', 'gyro', 'buttons'] });
-  kb.on('key',    e => console.log(e.text));
-  kb.on('move',   e => moveCursor(e.dx, e.dy));
-  kb.on('button', e => click(e.button, e.down));
+  const output = document.querySelector('#text');
+  const keyboard = QRKeyboard.create({ el: '#qr', name: 'My screen', caps: ['keyboard'] });
+  keyboard.on('key', event => {
+    if (event.text !== undefined) output.textContent += event.text;
+    else if (event.code === 8) output.textContent = [...output.textContent].slice(0, -1).join('');
+    else if (event.code === 10) output.textContent += '\n';
+  });
+  keyboard.on('finish', () => { output.textContent = ''; });
 </script>
 ```
 
-Your users scan, their phone opens our controller, and their input arrives in
-your code — keystrokes and pointer motion encrypted end-to-end (we can't read
-them; the key lives only in the QR).
+Your page and the phone both use the hosted relay over the internet. The phone
+never needs access to your localhost server; different networks are fine. Input
+is encrypted between endpoints. You host your application; we host the phone
+page and relay.
 
-## Docs
+## Deploy the same file
 
-- **[QUICKSTART.md](QUICKSTART.md)** — get running in two minutes (web or MCU).
-- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** — the complete API: endpoints,
-  capabilities, event formats, QR retrieval, handshake, reference tables.
-- **[USE_CASES.md](USE_CASES.md)** — what people build with it, and which
-  scenarios need care with a publicly-visible QR.
-- **[LOW_END_MCU.md](LOW_END_MCU.md)** — patterns for reaching the API from
-  constrained microcontrollers.
-- **[examples/](examples/)** — a minimal working web page.
+Upload `index.html` to an HTTPS static host. There is no build step for the starter
+and no QRKeyboard service to deploy yourself. [Deployment instructions](DEPLOY.md)
+include a drag-and-drop path and a CLI path.
 
-## What we provide vs. what you build
+## Choose the interaction after your first success
 
-We provide the QR-getting API, the event stream, and the hosted phone
-controller. You build your screen (a web page, a microcontroller, a game) and
-reach the API from it. We ship no device firmware or SDK beyond the optional
-`v1.js` web helper — the raw HTTP/WebSocket API works from anything.
+| Application | Phone experience | Example |
+|---|---|---|
+| Live field entry | Type and see edits immediately | [Starter](examples/index.html) |
+| TV search or kiosk message | Compose, then Search / Send | [Message entry](examples/message.html) |
+| Presentation | Previous slide / Next slide | [Presentation](examples/presentation.html) |
 
-## Status
+Message entry and named actions require the updated hosted service. Start with
+the live keyboard example while that release is pending.
 
-Live at **https://qrkeyboard.com**. End-to-end encryption is always on; an
-optional PIN adds access control on a public QR. Free to start.
+## Where to go next
+
+- [Quick start](QUICKSTART.md): from an empty folder to your first working page.
+- [Deploy your page](DEPLOY.md): publish it and verify the result.
+- [Example guide](examples/README.md): runnable files and how to choose one.
+- [API reference](DEVELOPER_GUIDE.md): options, events, delivery, and session cleanup.
+- [Use cases](USE_CASES.md): the three interaction patterns.
+- [Embedded devices](LOW_END_MCU.md): advanced firmware/bridge integration.
+- [Release status](RELEASE_STATUS.md): implemented versus deployed behaviour.

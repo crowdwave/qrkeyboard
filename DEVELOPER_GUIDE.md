@@ -1,327 +1,201 @@
-# qrkeyboard — Developer Guide
+# QRKeyboard API reference
 
-Everything you need to put a QR code on your screen so that when your end user
-scans it, their phone becomes an input device — with exactly the capabilities you
-choose (keyboard, gyro mouse, buttons, scroll) — and the input arrives in your
-code. No app for them to install; nothing to host but your own screen.
+Use this reference after the [copy-and-run quick start](QUICKSTART.md).
+To publish your receiving page, use [Deploy your page](DEPLOY.md). There is no
+QRKeyboard backend to deploy for an ordinary browser integration.
 
-> **Base URL.** `https://qrkeyboard.com` (live). WebSocket URLs use `wss://` on
-> the same host.
+This reference describes the updated checkout. Message mode, named actions,
+delivery acknowledgements, and Finish are [pending service deployment](RELEASE_STATUS.md).
+The starter explicitly uses the existing live-key API.
 
----
+Your application displays the QR and handles the input. The phone opens our
+hosted page; both endpoints use the internet relay at `https://qrkeyboard.com`.
+The phone does not need to reach your development server.
 
-## 1. How it works (the whole model in one minute)
+## Browser setup
 
-```
-   You create an instance ─► you get a short joinUrl + a QR
-   End user scans the QR   ─► their phone opens OUR controller (app.qrkeyboard.com)
-   Controller shows exactly the inputs YOU declared (keyboard / gyro / buttons…)
-   End user's input        ─► arrives in YOUR code as events (web) or frames (MCU)
-```
-
-Three parties:
-- **You / your screen** — a web page, or a microcontroller, or a game. You show a
-  QR and consume input. This is all you build.
-- **qrkeyboard (us)** — the phone controller UI, the relay, pairing, encryption.
-  You never build the phone side.
-- **The end user's phone** — scans, gets the controller, sends input. No install.
-
-> **Scope of what we provide.** Just two things: an API to **get a QR** and a
-> stream to **receive events** (plus the hosted phone controller the QR opens).
-> We do **not** ship MCU firmware, device SDKs, or bridge code — you talk to the
-> HTTP/WebSocket API below from whatever your screen is. The optional `v1.js`
-> web helper is a thin convenience; the raw API works without it.
-
-You interact with the system in exactly **two moments**: (1) create an instance
-and obtain its QR, (2) receive input events. Everything below fills those in.
-
----
-
-## 2. The three choices you make
-
-| Choice | Options |
-|---|---|
-| **Capabilities** you offer | `keyboard`, `gyro` (motion pointer), `touch` (trackpad), `buttons`, `scroll` |
-| **How you show the QR** | web SDK auto-renders it · fetch it as SVG/PNG · MCU gets it pushed over one socket |
-| **Where input goes** | high-level events (web SDK) · raw binary frames (MCU) |
-
-You declare capabilities once, at instance creation. The controller the end user
-sees renders **only** those inputs, and you only receive events for what you
-offered.
-
----
-
-## 3. Quick start — web page (2 minutes)
-
-```html
-<script src="https://qrkeyboard.com/v1.js"></script>
-<div id="qrkb"></div>
-<script>
-  const kb = QRKeyboard.create({
-    el: '#qrkb',
-    caps: ['keyboard', 'gyro', 'buttons'],   // what the phone will offer
-    name: 'My Dashboard'                      // shown on the phone to confirm
-  });
-
-  kb.on('key',    e => insertText(e.text));           // keyboard
-  kb.on('move',   e => moveCursor(e.dx, e.dy));        // gyro / touch pointer
-  kb.on('button', e => click(e.button, e.down));       // buttons
-  kb.on('scroll', e => scrollBy(e.dy));                // scroll
-  kb.on('connect',    () => {});                       // a phone paired
-  kb.on('disconnect', () => {});                       // it left
-</script>
-```
-
-`QRKeyboard.create` renders the QR into `#qrkb`, pairs through our relay, and
-emits events. Deploy your page over HTTPS (any host) and it works.
-
-**Zero-code variant** — drive the DOM directly (phone acts like a real
-mouse/keyboard on your page):
-```js
-QRKeyboard.create({ el: '#qrkb', caps: ['gyro','keyboard'], target: document.body });
-// dispatches native pointermove / keydown / wheel on the target
-```
-
----
-
-## 4. Quick start — microcontroller (single socket)
-
-The device opens **one** WebSocket; the relay creates the instance and **pushes
-the QR bitmap back**. No QR library, no HTTP, no tokens to manage.
-
-```
-1. Open  wss://qrkeyboard.com/provision?role=device&caps=keyboard,gyro,buttons
-2. Receive JSON  { "type":"provision", "code", "joinUrl", "ownerToken", "qr" }
-       → "qr" is a 0/1 grid (§8): blit a filled cell for each '1' onto your display
-       → persist ownerToken in flash (to reclaim the same QR after reboot)
-3. Receive JSON  { "type":"ready" }
-4. Loop: receive BINARY input frames (§7) → act on them; send a keepalive ping ≤120 s
-```
-Everything you need is in the one `provision` message — the QR grid included — so
-there's nothing binary to demultiplex and no QR library required.
-
-Reboot with a stable QR: connect `wss://…/s/<code>?role=device`, send
-`{"t":"auth","owner":"<ownerToken>"}`, and you're back on the same code.
-
-That's the entire contract — you implement it on your device in whatever
-language/stack you use. Can't do TLS (AVR-class)? **LOW_END_MCU.md** collects
-patterns *you* can use (a Wi-Fi coprocessor that does TLS for you, or a
-plaintext-LAN setup); the frame contract below is identical regardless.
-
----
-
-## 5. Declaring capabilities
-
-Capabilities are the config you set when creating the instance. They are public
-to the phone (via `/j/<code>`) so the controller renders exactly them.
-
-```json
-{
-  "layout": "auto",                       // auto | keyboard | pointer | gamepad
-  "caps":   ["keyboard", "gyro", "buttons", "scroll"],
-  "name":   "My Device",                  // shown on the controller to confirm
-  "rotate": false                         // true → rotate the QR for public screens
-}
-```
-
-| Capability | Phone shows | You receive |
-|---|---|---|
-| `keyboard` | native keyboard + extras bar | `key` events / `KEY` frames |
-| `gyro` | clutch-to-aim motion pointer | `move` + `button` |
-| `touch` | trackpad surface | `move` + `button` |
-| `buttons` | on-screen buttons / d-pad | `button` events / `BUTTON` frames |
-| `scroll` | scroll gesture | `scroll` events / `SCROLL` frames |
-
-Offer only what you handle. A phone that scans a `["keyboard"]` instance never
-shows a pointer, and you never get `move` events.
-
-### PIN / restricted access (optional)
-
-By default anyone who can see your QR can connect — right for public screens. To
-make the QR public but **control restricted**, add a PIN:
+Load `https://qrkeyboard.com/v1.js`, then call `QRKeyboard.create(options)`.
+Create the keyboard after the QR/output elements exist, and register event
+handlers immediately. The returned object is available before network setup
+finishes. In the updated SDK, `keyboard.ready` resolves when the instance/QR has
+been prepared and rejects on setup failure; listen for `error` to show a useful
+message. Creating a keyboard does not wait for a phone to scan it.
 
 ```js
-QRKeyboard.create({ el:'#qrkb', caps:['keyboard'], pin: '4271' });  // you set it
-QRKeyboard.create({ el:'#qrkb', caps:['keyboard'], pin: true });    // random → kb.pin, display it
+const keyboard = QRKeyboard.create({ el: '#qr', name: 'My screen', caps: ['keyboard'] });
+keyboard.on('key', handleInput);
+keyboard.on('error', showConnectionError);
 ```
 
-- `pin: '…'` — a password you set; tell authorized users out of band (staff, a
-  printed card). Persistent.
-- `pin: true` — the SDK generates a random PIN in `kb.pin`; show it on your
-  screen for the user to type. Ephemeral, and doubles as anti-tamper (a swapped
-  QR won't match the PIN on the real screen).
+`handleInput` and `showConnectionError` are your application callbacks; the
+[starter](examples/index.html) supplies complete implementations. In a framework,
+create once on mount, then call `close()` on unmount. The classic script exposes
+`window.QRKeyboard`; no package import is required.
 
-The user is prompted for the PIN on their phone; only the correct PIN connects.
-It's built on the **SPAKE2** protocol, so the PIN **can't be brute-forced
-offline**, and wrong guesses are limited (5 tries, then `kb.on('locked', …)`
-fires). In PIN mode the **QR carries no key** — a photographed QR is useless
-without the PIN. Think of it as WPA: the QR is the network name, the PIN is the
-password.
-
-Events: `kb.on('pinfail', e => …)` (wrong PIN, `e.attemptsLeft`) and
-`kb.on('locked', …)` (attempts exhausted).
-
----
-
-## 6. Getting the QR — all the ways
-
-### a) Web SDK (auto) — §3. It renders the QR for you; nothing else to do.
-
-### b) HTTP API — fetch the QR yourself (web asset, print, custom UI)
-```
-POST /i                       body = your config (§5)   →  { code, joinUrl, ownerToken, qrUrl, relay }
-GET  /i/<code>/qr?format=…    header: Authorization: Bearer <ownerToken>
-```
-`ownerToken` is shown once and is the **only** key that can fetch this instance's
-QR — keep it server-side / in device flash; never send it to the phone.
-
-| `format` | Content-Type | For |
+| Option | Default | Meaning |
 |---|---|---|
-| `svg` (default) | image/svg+xml | web, print, any size |
-| `png` | image/png | fixed-size raster |
-| `bits` | text/plain | MCUs — a 0/1 grid you draw yourself (§8) |
+| `el` | none | CSS selector or element for the QR, instructions, status, and PIN |
+| `name` | `This screen` | Destination shown on the phone |
+| `mode` | `live` | `live` streams edits; `text` sends a complete message |
+| `submitLabel` | `Send` | Text on the submit button; also describes Enter's action |
+| `caps` | `['keyboard']` | Supported hosted inputs: `keyboard`, `buttons` |
+| `actions` | none | Up to 16 `{ id, label }` named actions; adds buttons if caps are omitted |
+| `pin` | none | `true` generates/displays a PIN; a string sets one |
+| `region` | automatic | Optional relay placement hint: `wnam`, `enam`, `sam`, `weur`, `eeur`, `apac`, `oc`, `afr`, `me` |
+| `cellSize`, `margin` | `4`, `4` | QR rendering options |
+| `target` | none | Advanced: dispatch synthetic keydown events to this element; does not insert text automatically |
 
-Style params: `size=<px>` or `scale=<px/module>` · `margin=<modules>` ·
-`dark=<hex>` · `light=<hex>` · `shape=square|rounded|dots` (svg) · `ecc=L|M|Q|H`.
+Buttons-only setup uses `caps: ['buttons']`. Without explicit action labels,
+buttons are named **Previous** and **Next**. Prefer labels specific to your app.
+
+The QR panel emits its own accessible status and instructions. Style
+`.qrkeyboard-pairing` and `.qrkeyboard-code` to fit your screen. Keep the QR dark
+on white, leave its quiet zone intact, and keep it large enough to scan.
+
+## Input events and delivery confirmation
 
 ```js
-// embed without leaking the owner token into an <img> URL:
-const r = await fetch(qrUrl + '?format=svg&shape=rounded&dark=1f6feb',
-                      { headers: { Authorization: `Bearer ${ownerToken}` } });
-document.querySelector('#qr').src = URL.createObjectURL(await r.blob());
+keyboard.on('text', async ({ text }) => {
+  await saveMessage(text);
+});
 ```
 
-### c) MCU provisioning — the QR is pushed over the socket. §4.
+The phone reports **Sent** after every handler for that event completes. Returning
+a Promise delays acknowledgement until the operation finishes. Throwing or
+rejecting reports failure to the phone. With no input handler, the SDK rejects
+the input rather than claiming delivery. This confirms handler completion, not
+any downstream effect the handler neglected to await.
 
----
-
-## 7. Receiving input
-
-### Web (SDK events)
-| Event | Fields | Meaning |
+| Event | Payload | When |
 |---|---|---|
-| `key` | `{ text }` or `{ code }` | text typed, or a special key (Enter/Backspace/arrows) |
-| `move` | `{ dx, dy }` | pointer delta (screen-space, already fused from the gyro) |
-| `button` | `{ button, down }` | button id, pressed/released |
-| `scroll` | `{ dx, dy }` | scroll delta |
-| `connect` / `disconnect` | — | a phone paired / left |
-| `member` (multi-user) | on every event | which participant (see §9) |
+| `key` | `{ text, id }` or `{ code, id }` | Live text edits or special keys |
+| `text` | `{ text, action, id }` | Complete-message submission; `action` is the submit label |
+| `action` | `{ action, label, id }` | Named button activated; `action` is its configured action ID |
+| `state` | `{ state, message }` | `preparing`, `scan`, `connected`, `lost`, `finished`, `error` |
+| `ready` | `{ code }` | A fresh instance and QR have been prepared |
+| `connect`, `disconnect` | `{}` | Phone pairing established or lost |
+| `finish` | `{ code }` | Old session ended; clear application state before a fresh QR is created |
+| `reset` | `{}` | Finish handlers completed |
+| `pinfail` | `{ attemptsLeft }` | PIN confirmation failed |
+| `locked` | `{}` | Five failed PIN confirmations; create a fresh session |
+| `error` | Error | Network, input-handler, pairing, or reset failure |
 
-### MCU / raw (binary frames)
-Every input is a small binary WebSocket frame; **byte 0 is the type**. Multi-byte
-integers are big-endian. (The web SDK parses these for you.)
+Special key codes: `8` Backspace, `9` Tab, `10` Enter, `27` Escape, `37–40` arrows.
+In live mode the phone diffs committed text and emits suffix backspaces/text.
+The receiving application should remove one Unicode code point per Backspace.
+Bulk deletions travel as one counted key message; the SDK expands them into
+individual Backspace events without flooding the relay.
 
-| Frame | Bytes | Layout |
-|---|---|---|
-| `MOVE` | 5 | `01  dxHi dxLo  dyHi dyLo` (int16 dx, int16 dy) |
-| `BUTTON` | 3 | `02  buttonId  down(1/0)` |
-| `SCROLL` | 3 | `03  deltaHi deltaLo` (int16) |
-| `KEY` (text) | 2+n | `04  00  <utf-8 bytes>` |
-| `KEY` (special) | 3 | `04  01  keycode` (8=Bksp, 9=Tab, 10=Enter, 27=Esc, 37-40=arrows) |
-| `SETTLE` | 1 | `05` — motion ended; last position is final (loss repair) |
+Messages must fit the relay's 1024-byte encrypted-frame limit. New JSON envelopes
+are limited to 950 plaintext bytes. Oversized complete messages are rejected on
+the phone with a request to shorten them; live text is split into small chunks.
+Duplicate message IDs are acknowledged without repeating the handler while they
+remain in the current SDK session's bounded cache (256 messages).
 
-Pointer frames are latest-wins: if you fall behind, jump to the newest and smear
-2–3 frames rather than snapping. Keyboard frames are reliable — apply in order.
+Register the handler matching the mode: `key` for live typing, `text` for complete
+messages, `action` for named buttons. Setting `mode: 'text'` alone is insufficient
+if your app only listens for `key`. The [examples](examples/README.md) show all
+three working setups.
 
----
+## Session lifecycle
 
-## 8. The QR grid format (`bits`) — for MCUs that render it themselves
+`await keyboard.finish()` (also `restart()`) ends the current instance through
+the authenticated API, closes connections, awaits `finish` handlers, and prepares
+a fresh QR/key/PIN as applicable. Old links and credentials cease to work.
+If your reset handler fails, the SDK does not admit the next visitor; fix or retry
+the reset. Always clear application-owned state in `finish` for shared screens.
 
-`format=bits` (and the `qr` field in the provision message) is a plain text grid:
-```
-one line per row, '1' = dark module, '0' = light (a 0-border quiet zone included)
-e.g.
-    0000000000...
-    0011111110...
-    0010000010...
-    ...
-```
-Split on newline; for every `'1'` draw a filled cell on your display. No
-bit-packing, no format to learn, parses in any language. A small QR is ~29–49
-lines; each line is `size + 2·margin` characters.
+The phone's **Finish** requests this same operation over the encrypted connection.
+Its **Disconnect** only stops that phone connection and clears its local
+credential. A new visitor can join after it closes. Only one active phone is
+accepted per session; a credential reconnect replaces its previous connection.
 
----
+`close()` stops SDK timers and sockets. It does not invalidate the server session.
+The relay expires unused sessions after 30 days. Reconnection uses a short
+exponential backoff. Pending unconfirmed inputs are not automatically replayed;
+users are asked to check the receiving screen before sending again.
 
-## 9. Connection lifecycle & multi-user
+## Pairing and privacy
 
-- **Pairing:** end user scans → controller loads → pairs. You get `connect`.
-- **Presence:** you're told when the peer is up/down (`connect`/`disconnect`;
-  raw: `{"type":"peer","up":bool}`).
-- **Reconnect:** the phone keeps a credential and rejoins automatically; the
-  device reclaims its code with the `ownerToken`.
-- **Multiple phones (a shared screen):** create with `{ "room": true }`. Every
-  event then carries a stable `member` id; you also get join/leave and can
-  `kick(id)`. What appears on screen is your app — we deliver attributed input,
-  nothing more.
+No-PIN QRs contain a random 32-byte key in their URL fragment. The phone removes
+the fragment from the address bar after reading it. Anyone who captures that QR
+can possess its key; keep private-input QRs out of broadcasts and finish sessions
+between visitors. PIN mode omits the key and uses SPAKE2 with explicit confirmation.
+The SDK's five-attempt PIN limit applies to the current running screen session.
 
----
+Both modes derive directional AES-256-GCM keys using HKDF. Input, acknowledgements,
+and finish requests are encrypted at the endpoints. The relay forwards opaque
+binary frames and holds only hashed owner/phone credentials, public configuration,
+and session metadata. Displaying a PIN beside a public QR aids pairing, but does
+not restrict access against people who can read both.
 
-## 10. Security — what you get, and the one rule
+## Advanced: raw HTTP and WebSocket API
 
-**Free & automatic:** pairing requires physical sight of your QR; per-session
-credentials; single-use, time-limited join; **end-to-end encryption** (AES-256-GCM,
-key carried only in the QR) so even we can't read the input. Capabilities are
-enforced controller-side — a phone can't send input types you didn't offer.
+### Create
 
-**The one rule:** without a PIN, a QR is a bearer capability for its lifetime —
-**don't display a no-PIN pairing QR where it can be photographed or streamed if
-the input is confidential** (e.g. someone typing a password). If a screen is both
-public *and* handles confidential/restricted input, use a **PIN** (above): the QR
-can then be as public as you like — a photo is useless without the PIN. Never use
-qrkeyboard for OS-level/console input on a publicly-visible no-PIN QR.
-Per-scenario guidance: **USE_CASES.md**.
+`POST /i` with JSON configuration (`caps`, `name`, `mode`, `submitLabel`, `actions`,
+`pinRequired`, optional `region`) returns `code`, `joinUrl`, `ownerToken`, `qrUrl`,
+and the device-role `relay` URL. Creation is limited to 20 requests per IP/minute.
+Store the owner token privately. The raw API does not generate an endpoint key.
+To use the hosted phone page, implement key generation/QR assembly or PIN pairing.
 
----
+### Resolve
 
-## 11. Reference
+`GET /j/<code>` returns public `config` and the phone-role relay URL. Unknown or
+finished instances return 404. Possession of a code permits requesting a phone
+join, but encrypted input requires the endpoint pairing secret.
 
-### Endpoints
-| Method · Path | Auth | Purpose |
-|---|---|---|
-| `POST /i` | none | create instance (body = config §5) → `{code, joinUrl, ownerToken, qrUrl, relay}` |
-| `GET /i/<code>/qr` | `Bearer ownerToken` | QR as svg/png/bin (§6) |
-| `GET /provision` (WS, `role=device`) | connection = capability | single-socket create + QR push (§4) |
-| `GET /j/<code>` | none (code = permission) | phone config incl. declared caps |
-| `GET /s/<code>?role=device\|phone` (WS) | first-message (below) | the relay |
-| `GET /healthz` | none | health |
+### QR formats
 
-### Relay WebSocket handshake (`/s/<code>`)
-1. Server → `{"type":"hello","v":1}`.
-2. Client → auth as its **first** message:
-   - device: `{"t":"auth","owner":"<ownerToken>"}`
-   - phone first join: `{"t":"join"}` → server issues `{"type":"credential","role":"phone","value":"<cred>"}`
-   - phone reconnect: `{"t":"auth","cred":"<cred>"}`
-3. Server → `{"type":"ready"}`, then `{"type":"peer","up":bool}` on presence changes.
-4. Data plane: binary frames (§7), forwarded verbatim device↔phone.
+`GET /i/<code>/qr` requires `Authorization: Bearer <ownerToken>`. Formats are
+`svg` (default), `png`, and `bits` (a newline-separated grid of `0`/`1`). Render
+options include `ecc=L|M|Q|H`, `margin`, `scale`, `size`, `dark`, `light`, and
+`shape=square|rounded|dots`. Raw server QRs contain only the join code, not a
+client-generated encryption key. The browser SDK generates the usable keyed QR
+locally. Every custom QR display should say **Scan with your phone camera to type
+here** and show a destination name.
 
-Secrets travel in messages, never in URLs (so they aren't logged). Send a
-keepalive ≤120 s idle.
+### Connect
 
-### Close codes
-| Code | Meaning |
-|---|---|
-| 4001 | internal / no attachment |
-| 4003 | bad auth (wrong owner token, bad credential, malformed) |
-| 4004 | no such instance (create it first) |
-| 4008 | auth timeout (didn't authenticate in 10 s) or rate limit |
-| 4009 | frame too large (>1024 bytes) |
+`GET /s/<code>?role=device|phone` upgrades to a WebSocket. Within 10 seconds:
 
-### Limits
-Frame ≤1024 B · ≤120 msgs/s and ≤32 KB/s per socket · 30-day idle session
-expiry · session id (code) is 16-char base32 (~80-bit, server-allocated).
+- Device sends `{ "t": "auth", "owner": "<ownerToken>" }`.
+- First phone sends `{ "t": "join" }`, receives `{ "type": "credential", "value": "..." }`.
+- Reconnecting phone sends `{ "t": "auth", "cred": "..." }`.
 
----
+The relay sends `hello`, `ready`, and `peer` presence messages as JSON strings.
+Authenticated input is binary. Limits are 120 frames/sec and 32 KiB/sec per
+socket, 1024 bytes/frame, and 60 edge connections per IP/minute.
 
-## 12. What's live vs pending (2026-07-18)
+### End
 
-**Live & tested:** everything below — the relay, instance creation, owner-gated
-QR (svg/png/bits), single-socket provisioning, capability config, the full
-WebSocket handshake, the hosted phone controller, the `v1.js` web helper,
-end-to-end encryption, and PIN mode (SPAKE2) — all running at
-**https://qrkeyboard.com** and verified through a real browser.
+`POST /i/<code>/end`, with `Authorization: Bearer <ownerToken>`, invalidates the
+session and closes every socket with code `4010`. Missing/incorrect owner tokens
+return 401/403; unknown or ended instances return 404. Session reset allocates a
+new instance rather than reusing an ended code.
 
-**Pending:** a service-worker offline mode. Does not change the contract above.
+### Provision a device over one socket
 
-**Out of scope (we do not provide):** MCU firmware, device/embedded SDKs, bridge
-firmware, prebuilt flashable binaries. You reach the API above from your own
-device code. We provide the QR and the events; the rest of your screen is yours.
+`/provision` allocates an instance and pushes a JSON `provision` message containing
+`code`, `joinUrl`, `ownerToken`, and a QR bitmap, followed by `ready`. Persist the
+owner token to reconnect as the device. Firmware still needs endpoint encryption
+and pairing; this is an advanced transport API, not a ready-made phone keyboard
+for an arbitrary MCU. See [embedded guidance](LOW_END_MCU.md).
+
+## Advanced: application messages and compatibility
+
+Encrypted frame: `e1 | 12-byte random nonce | AES-GCM ciphertext + tag`.
+New plaintext: `10 | UTF-8 JSON`. Message types:
+
+- `key`: `{ type, id, text }` or `{ type, id, code }`; Backspace may include a
+  `count` (expanded into individual events, capped at 10000).
+- `text`: `{ type, id, text }`.
+- `action`: `{ type, id, action }` (configured action ID).
+- `finish`: `{ type, id }`.
+- `ack`: `{ type, id, ok }` (screen to phone).
+
+The SDK continues to decode older binary `KEY` (`04`), `BUTTON` (`02`), `MOVE`
+(`01`), `SCROLL` (`03`), and `SETTLE` (`05`) frames for custom clients. Those legacy
+frames do not carry acknowledgement IDs. Pointer/scroll interfaces are not
+features of the current hosted phone keyboard. Local design experiments and
+historical plans are kept separately from this API.

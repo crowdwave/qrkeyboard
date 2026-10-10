@@ -1,125 +1,46 @@
-# qrkeyboard — Use Cases
+# What QRKeyboard is for
 
-The primitive: **scan a QR on any screen → your phone becomes an input device
-for it (gyro pointer, keyboard, buttons, multi-user), with no app install.** We
-provide the mechanism (controller + relay + pairing); integrators build the
-screen. Everything below is that one primitive dressed for a context.
+For a first run, use the [quick start](QUICKSTART.md). This guide describes the
+updated checkout; check [release status](RELEASE_STATUS.md) before using features
+that require the new hosted service.
 
-Each entry notes: who the *screen* is, what input model, connection path
-(LAN-direct / relay / either), single vs multi-user, and the security-sensitive
-angle (informs the QR-exposure guidance below).
+**Scan the code. Type on your phone. It appears on the screen.**
 
-> ⚠️ **Public-QR flag.** Use cases whose QR is
-> displayed where it can be *photographed, streamed, or physically swapped* carry
-> two risks that are inherent, not bugs: a captured QR yields the E2E key for the
-> session's life, and a swapped sticker (quishing) defeats "sight of the
-> screen". These are flagged **[PUBLIC-QR]** below and require: short
-> TTL + per-join rotation, the ticketed ECDH mode for confidential input, screen
-> name/nonce confirmation in the controller, and tamper-evident installs.
-> Use cases with a private, in-hand QR do not carry these.
+Start with one of these three patterns. Each requires integration into the
+receiving application; QRKeyboard does not control arbitrary desktop apps.
 
----
+## TV search
 
-## A. Screens without keyboards (the core problem)
+The TV app displays a QR beside its search field. The phone says **Typing into:
+TV search** and offers a message box with a **Search** button. Use `mode: 'text'`
+and `submitLabel: 'Search'`; handle `text` by performing the search. Return its
+Promise so the phone confirms delivery after the application accepts the query.
 
-1. **Smart TV / set-top / media centre** — screen = TV app; keyboard + gyro
-   pointer replace an awful remote. Single-user, LAN-direct ideal.
-   *Sensitive:* people type streaming-service passwords → keystroke
-   confidentiality is paramount.
-2. **Digital signage / menu boards** **[PUBLIC-QR]** — screen = the sign; staff
-   update text from a phone. Single or few trusted users, relay (often not
-   co-located). *Sensitive:* the pairing QR is visible to the public and
-   physically reachable for swapping — use ticketed rotation; never show a
-   confidential-input QR on the sign itself.
-3. **Kiosks / self-service terminals** **[PUBLIC-QR]** — screen = kiosk; visitor
-   uses own phone instead of a grubby touchscreen. Single-user, ephemeral, LAN
-   or relay. *Sensitive:* unattended → prime quishing target (tamper-evidence
-   needed); session must not leak to the *next* user; no persistence.
-4. **Conference / event display** **[PUBLIC-QR]** — screen = stage or booth
-   screen; presenter or attendees drive it. Single or multi, relay. A QR on a
-   projected/streamed screen is broadcast to everyone — rotate per join.
-5. **Hotel-room TV** — guest pairs, controls, and pairing must fully expire at
-   checkout. *Sensitive:* credential lifetime vs room turnover.
+## Kiosk text entry
 
-## B. Touchless / hygiene
+A visitor scans to enter a name or message using their own keyboard. Give the
+kiosk a recognisable destination name. Use `mode: 'text'`, handle `text`, and
+clear all visitor data in the `finish` handler. Finish invalidates the previous
+QR and creates a fresh session before the next visitor joins.
 
-6. **Hospital / cleanroom displays** — own-phone input avoids shared surfaces.
-   *Sensitive:* clinical context, but we hold no PHI (E2E, no persistence) —
-   that's a feature to state explicitly.
-7. **Food-service POS / order screens** — staff or customer input by phone.
-8. **Public information terminals** (libraries, transit, government)
-   **[PUBLIC-QR]** — accessibility + hygiene. *Sensitive:* untrusted public;
-   unattended quishing target; abuse of the pipe; the phone as a
-   personalized assistive device.
+For restricted input, use PIN pairing and choose where to display the PIN based
+on who should have access. Avoid broadcasting confidential-input pairing codes.
 
-## C. Presentation & AV / creative
+## Presentation buttons
 
-9. **Slide clicker + laser-pointer gyro cursor** — screen = presentation app.
-   Single-user, LAN-direct (latency matters). The flagship gyro demo.
-10. **OBS / stream-deck / production control** — screen = control surface;
-    buttons + sliders via layouts-as-data.
-11. **Projection mapping / art installations** — gyro + multi-cursor; possibly
-    OSC bridge downstream (integrator's side).
-12. **Live-event audience participation** — screen = venue display; N phones;
-    reactions/pointers. Multi-user, relay, *ticketed* pairing.
+The screen offers a QR for the presenter. Configure `caps: ['buttons']` and named
+**Previous slide** and **Next slide** actions. The phone shows only those controls,
+with no keyboard. Add a PIN if attendees should not be able to advance slides.
 
-## D. Makers & embedded
+## Picking a mode
 
-13. **ESP32 / Raspberry Pi projects** needing occasional input without a
-    dedicated keyboard — screen = the device. LAN-direct.
-14. **Headless-server rescue input** — the flashable USB-HID dongle: plug into
-    any host, scan, type. *Sensitive:* this injects OS-level input into a
-    trusted machine → **highest-consequence integration**; a QR-observer
-    takeover here means arbitrary keystrokes at a console. Keep the QR
-    private (in-hand, never on a shared/streamed screen); prefer LAN-direct.
-15. **3D printer / CNC / appliance consoles** — screen = machine UI.
-16. **Robot / gimbal / RC teleoperation** — gyro as an intuitive controller.
-    LAN-direct (latency + safety). *Sensitive:* input drives physical motion;
-    loss-of-signal behavior matters (the SETTLE/keepalive design).
+| Need | Use |
+|---|---|
+| See edits immediately on another screen | Default live keyboard; `key` handler |
+| Compose, review, then send once | `mode: 'text'`; `text` handler |
+| Perform a few clear commands | Named `actions`; `action` handler |
 
-## E. Games
-
-17. **Casual motion games in any browser tab** — screen = web game; gyro/buttons.
-18. **Couch / party gaming, arcade cabinets** — N phones as controllers.
-    Multi-user, LAN-direct, open pairing.
-19. **Jackbox-style quiz / trivia** — screen = host display; N phones buzz/answer
-    via structured layouts. Multi-user, relay, ticketed.
-
-## F. Multi-user / shared-screen (mechanism = N phones, one screen)
-
-20. **Party / wedding guestbook wall** — N guests post to a shared display.
-    Open pairing (physical presence is the gate).
-21. **Classroom / lecture response board** — students answer/annotate. Ticketed
-    or roster-gated (integrator's app).
-22. **Collaborative whiteboard / brainstorming wall** — multi-cursor + text.
-23. **Public "crowd input" screens** (times-square-style) **[PUBLIC-QR]** — the
-    highest-risk multi-user case; *ticketed*, rotating QR, integrator
-    moderation. The screen broadcasts its own QR — rotation is mandatory,
-    and content shown is the integrator's responsibility (mechanism-only).
-
-## G. Accessibility
-
-24. **Own-phone as input for public terminals** — a device already tuned to the
-    user's abilities (font size, switch access, voice) drives an untailored
-    screen. A genuine accessibility win, not a side effect.
-25. **Gyro pointing for users who struggle with trackpads/mice** — coarse motor
-    control mapped to an adaptive-gain pointer.
-
----
-
-## Cross-cutting dimensions
-
-- **QR exposure**: private (in-hand device, hotel room) vs public/broadcast
-  (signage, TV on a stream, times-square screen). Public ⇒ pairing-token and
-  room-key exposure is the dominant risk.
-- **Consequence of input**: cosmetic (a guestbook) vs OS-level (HID dongle,
-  #14) vs physical motion (robot, #16). Higher consequence ⇒ stricter pairing
-  and loss-of-signal semantics.
-- **Trust among users**: single trusted owner vs cooperating group vs hostile
-  public. Drives open vs ticketed pairing and rate/kick needs.
-- **Persistence expectation**: ephemeral (kiosk, hotel) vs durable pairing
-  (personal TV, maker device). Drives credential TTL.
-- **Connection path**: LAN-direct (lowest latency, offline-capable) vs relay
-  (universal) — changes the attack surface (LAN sniffing vs relay operator).
-- **Who hosts the screen**: our hosted screen vs integrator page vs
-  hardware. Changes where plaintext lives and who is responsible for content.
+These are the supported interaction patterns. Multi-user rooms, local-only
+transport, desktop injection, and experimental media/trackpad layouts are outside
+the current hosted phone keyboard. See the [quick start](QUICKSTART.md) to build
+one of the supported patterns.

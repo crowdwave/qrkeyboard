@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Phone buttons — presentation</title><style>body{font:18px/1.6 system-ui;max-width:680px;margin:40px auto;padding:20px}.qrkeyboard-code{max-width:240px}.qrkeyboard-code svg{width:100%}#slide{font-size:44px}button{font:inherit;padding:12px}[hidden]{display:none}</style></head><body>
+<h1>Presentation buttons</h1><div id="qr"></div><p id="slide">Slide 1</p><p id="status" role="status"></p><button id="finish">Finish session</button>
+<script src="https://qrkeyboard.com/v1.js"></script><script>
+let slide = 1;
+const output = document.querySelector('#slide'), status = document.querySelector('#status');
+const keyboard = QRKeyboard.create({ el: '#qr', name: 'Presentation', caps: ['buttons'], pin: true,
+  actions: [{ id: 'previous', label: 'Previous slide' }, { id: 'next', label: 'Next slide' }] });
+keyboard.on('action', ({ action }) => { slide = Math.max(1, slide + (action === 'next' ? 1 : -1)); output.textContent = 'Slide ' + slide; });
+keyboard.on('finish', () => { slide = 1; output.textContent = 'Slide 1'; status.textContent = ''; });
+keyboard.on('error', () => { status.textContent = 'Could not complete that operation. Try again.'; });
+document.querySelector('#finish').onclick = () => keyboard.finish().catch(() => {});
+</script></body></html>
