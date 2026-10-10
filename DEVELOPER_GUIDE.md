@@ -32,6 +32,23 @@ keyboard.on('error', showConnectionError);
 create once on mount, then call `close()` on unmount. The classic script exposes
 `window.QRKeyboard`; no package import is required.
 
+### Pin a version for production
+
+`/v1.js` always serves the latest SDK. To pin an exact, immutable build, load
+a versioned file with Subresource Integrity. Current paths and hashes are listed
+in [`https://qrkeyboard.com/sdk/manifest.json`](https://qrkeyboard.com/sdk/manifest.json)
+(`latest`, plus every published version):
+
+```html
+<script src="https://qrkeyboard.com/sdk/v1-<hash>.js"
+        integrity="sha384-<digest>" crossorigin="anonymous"></script>
+```
+
+Versioned files never change and stay online. Each records the protocol version
+it speaks; if the hosted phone page stops supporting that version, phones that
+scan your QR are told the screen needs updating. Move to a newer pinned file
+before then.
+
 | Option | Default | Meaning |
 |---|---|---|
 | `el` | none | CSS selector or element for the QR, instructions, status, and PIN |
@@ -41,7 +58,7 @@ create once on mount, then call `close()` on unmount. The classic script exposes
 | `caps` | `['keyboard']` | Supported hosted inputs: `keyboard`, `buttons` |
 | `actions` | none | Up to 16 `{ id, label }` named actions; adds buttons if caps are omitted |
 | `pin` | none | `true` generates/displays a PIN; a string sets one |
-| `region` | automatic | Optional relay placement hint: `wnam`, `enam`, `sam`, `weur`, `eeur`, `apac`, `oc`, `afr`, `me` |
+| `region` | automatic | Optional relay placement hint: `wnam`, `enam`, `sam`, `weur`, `eeur`, `apac`, `oc`, `afr`, `me`; any other value is rejected |
 | `cellSize`, `margin` | `4`, `4` | QR rendering options |
 | `target` | none | Advanced: dispatch synthetic keydown events to this element; does not insert text automatically |
 
@@ -71,13 +88,13 @@ any downstream effect the handler neglected to await.
 | `key` | `{ text, id }` or `{ code, id }` | Live text edits or special keys |
 | `text` | `{ text, action, id }` | Complete-message submission; `action` is the submit label |
 | `action` | `{ action, label, id }` | Named button activated; `action` is its configured action ID |
-| `state` | `{ state, message }` | `preparing`, `scan`, `connected`, `lost`, `finished`, `error` |
+| `state` | `{ state, message }` | `preparing`, `scan`, `connected`, `waiting` (a dropped phone may return), `lost`, `finished`, `error` |
 | `ready` | `{ code }` | A fresh instance and QR have been prepared |
 | `connect`, `disconnect` | `{}` | Phone pairing established or lost |
 | `finish` | `{ code }` | Old session ended; clear application state before a fresh QR is created |
 | `reset` | `{}` | Finish handlers completed |
-| `pinfail` | `{ attemptsLeft }` | PIN confirmation failed |
-| `locked` | `{}` | Five failed PIN confirmations; create a fresh session |
+| `pinfail` | `{ attemptsLeft }` | A PIN attempt ended without pairing (wrong PIN, or the phone left mid-check) |
+| `locked` | `{}` | Five PIN attempts without pairing; create a fresh session |
 | `error` | Error | Network, input-handler, pairing, or reset failure |
 
 Special key codes: `8` Backspace, `9` Tab, `10` Enter, `27` Escape, `37–40` arrows.
@@ -86,11 +103,12 @@ The receiving application should remove one Unicode code point per Backspace.
 Bulk deletions travel as one counted key message; the SDK expands them into
 individual Backspace events without flooding the relay.
 
-Messages must fit the relay's 1024-byte encrypted-frame limit. New JSON envelopes
-are limited to 950 plaintext bytes. Oversized complete messages are rejected on
-the phone with a request to shorten them; live text is split into small chunks.
-Duplicate message IDs are acknowledged without repeating the handler while they
-remain in the current SDK session's bounded cache (256 messages).
+Messages must fit the relay's 1024-byte frame limit. After the 29 bytes of
+framing and authentication tag, a JSON envelope may use 995 plaintext bytes,
+roughly 900 ASCII characters or 300 CJK characters of message text. In message
+mode the phone shows how much to shorten while the user types; live text is
+split into small chunks. A repeated message ID is acknowledged again without
+repeating the handler while it remains in the SDK's bounded cache (256 messages).
 
 Register the handler matching the mode: `key` for live typing, `text` for complete
 messages, `action` for named buttons. Setting `mode: 'text'` alone is insufficient
@@ -106,9 +124,13 @@ If your reset handler fails, the SDK does not admit the next visitor; fix or ret
 the reset. Always clear application-owned state in `finish` for shared screens.
 
 The phone's **Finish** requests this same operation over the encrypted connection.
-Its **Disconnect** only stops that phone connection and clears its local
-credential. A new visitor can join after it closes. Only one active phone is
-accepted per session; a credential reconnect replaces its previous connection.
+Its **Disconnect** stops that phone, clears its local credential and releases the
+session, so a new visitor can join straight away. Only one phone is accepted per
+session; a credential reconnect replaces its previous connection.
+
+If a paired phone drops without Disconnect (locked, switched apps, lost signal),
+only that phone may rejoin for 5 minutes. The screen shows the `waiting` state
+meanwhile, and Finish ends the reservation at any time.
 
 `close()` stops SDK timers and sockets. It does not invalidate the server session.
 The relay expires unused sessions after 30 days. Reconnection uses a short
@@ -121,23 +143,30 @@ No-PIN QRs contain a random 32-byte key in their URL fragment. The phone removes
 the fragment from the address bar after reading it. Anyone who captures that QR
 can possess its key; keep private-input QRs out of broadcasts and finish sessions
 between visitors. PIN mode omits the key and uses SPAKE2 with explicit confirmation.
-The SDK's five-attempt PIN limit applies to the current running screen session.
+Every PIN attempt counts toward the five-attempt limit of the running screen
+session, including attempts a phone abandons before confirming.
 
-Both modes derive directional AES-256-GCM keys using HKDF. Input, acknowledgements,
-and finish requests are encrypted at the endpoints. The relay forwards opaque
-binary frames and holds only hashed owner/phone credentials, public configuration,
-and session metadata. Displaying a PIN beside a public QR aids pairing, but does
-not restrict access against people who can read both.
+On every connection both endpoints contribute a fresh random salt, and HKDF
+derives directional AES-256-GCM keys from the pairing secret and both salts.
+Frames carry an increasing counter as their nonce, and each receiver accepts a
+counter only once and only in order, so a frame cannot be replayed, reordered, or
+carried into a later connection. The relay forwards opaque binary frames and
+holds only hashed owner/phone credentials, public configuration, and session
+metadata. Displaying a PIN beside a public QR aids pairing, but does not restrict
+access against people who can read both.
 
 ## Advanced: raw HTTP and WebSocket API
 
 ### Create
 
 `POST /i` with JSON configuration (`caps`, `name`, `mode`, `submitLabel`, `actions`,
-`pinRequired`, optional `region`) returns `code`, `joinUrl`, `ownerToken`, `qrUrl`,
-and the device-role `relay` URL. Creation is limited to 20 requests per IP/minute.
-Store the owner token privately. The raw API does not generate an endpoint key.
-To use the hosted phone page, implement key generation/QR assembly or PIN pairing.
+`pinRequired`, `protocol`, optional `region`) returns `code`, `joinUrl`,
+`ownerToken`, `qrUrl`, and the device-role `relay` URL. Set `protocol: 2`; the
+hosted phone refuses screens that do not declare a protocol it supports. Creation
+is limited to 20 requests per client per minute (IPv6 clients are counted per
+/64). Store the owner token privately. The raw API does not generate an endpoint
+key. To use the hosted phone page, implement key generation/QR assembly or PIN
+pairing.
 
 ### Resolve
 
@@ -147,13 +176,15 @@ join, but encrypted input requires the endpoint pairing secret.
 
 ### QR formats
 
-`GET /i/<code>/qr` requires `Authorization: Bearer <ownerToken>`. Formats are
-`svg` (default), `png`, and `bits` (a newline-separated grid of `0`/`1`). Render
-options include `ecc=L|M|Q|H`, `margin`, `scale`, `size`, `dark`, `light`, and
-`shape=square|rounded|dots`. Raw server QRs contain only the join code, not a
-client-generated encryption key. The browser SDK generates the usable keyed QR
-locally. Every custom QR display should say **Scan with your phone camera to type
-here** and show a destination name.
+`GET /i/<code>/qr` requires `Authorization: Bearer <ownerToken>` and is
+available for PIN instances (`pinRequired: true`). A server QR contains only the
+join code; without a PIN the phone also needs the screen's key in the QR, which
+the relay never sees, so keyed instances return `409` and must render their QR
+locally (the browser SDK does). Formats are `svg` (default), `png`, and `bits`
+(a newline-separated grid of `0`/`1`). Render options include `ecc=L|M|Q|H`,
+`margin`, `scale`, `size`, `dark`, `light`, and `shape=square|rounded|dots`.
+Every custom QR display should say **Scan with your phone camera to type here**
+and show a destination name.
 
 ### Connect
 
@@ -163,9 +194,14 @@ here** and show a destination name.
 - First phone sends `{ "t": "join" }`, receives `{ "type": "credential", "value": "..." }`.
 - Reconnecting phone sends `{ "t": "auth", "cred": "..." }`.
 
-The relay sends `hello`, `ready`, and `peer` presence messages as JSON strings.
-Authenticated input is binary. Limits are 120 frames/sec and 32 KiB/sec per
-socket, 1024 bytes/frame, and 60 edge connections per IP/minute.
+A socket that has not authenticated within 10 seconds is closed with `4008`.
+The relay sends `hello`, `ready`, and `peer` presence messages as JSON strings;
+a `peer` message with `up: false` may carry `reservedForMs` while a dropped phone
+may return. After authentication, the only text messages accepted are `k`
+(keepalive; the relay replies `k` itself) and, from the phone, `leave` (release
+the session). Input is binary. Limits are 120 frames/sec and 32 KiB/sec per
+socket, 16 MiB per session per hour, 1024 bytes/frame, and 60 connections per
+client per minute.
 
 ### End
 
@@ -176,16 +212,27 @@ new instance rather than reusing an ended code.
 
 ### Provision a device over one socket
 
-`/provision` allocates an instance and pushes a JSON `provision` message containing
-`code`, `joinUrl`, `ownerToken`, and a QR bitmap, followed by `ready`. Persist the
-owner token to reconnect as the device. Firmware still needs endpoint encryption
-and pairing; this is an advanced transport API, not a ready-made phone keyboard
-for an arbitrary MCU. See [embedded guidance](LOW_END_MCU.md).
+`/provision?protocol=2` allocates an instance and pushes a JSON `provision`
+message containing `code`, `joinUrl` and `ownerToken`, followed by `ready`. Add
+`pin=1` for a PIN instance; only then does the message also carry `qr`, a bit
+grid of the join URL, because only a PIN QR works without a key the device adds
+itself. Persist the owner token to reconnect as the device. Firmware still needs
+endpoint encryption and pairing; this is an advanced transport API, not a
+ready-made phone keyboard for an arbitrary MCU. See [embedded guidance](LOW_END_MCU.md).
 
 ## Advanced: application messages and compatibility
 
-Encrypted frame: `e1 | 12-byte random nonce | AES-GCM ciphertext + tag`.
-New plaintext: `10 | UTF-8 JSON`. Message types:
+Protocol 2 frames, each a binary WebSocket message:
+
+- `e3 | 16-byte salt`: sent by both endpoints when the peer is reported up.
+- `e0 | 65-byte SPAKE2 share` and `e2 | 32-byte confirmation`: PIN mode only.
+- `e1 | 12-byte nonce | AES-GCM ciphertext + 16-byte tag`: everything else. The
+  nonce is four zero bytes then a 64-bit big-endian counter starting at 0 for
+  each key; receivers drop any counter not greater than the last accepted one.
+
+Keys: HKDF-SHA-256 over the pairing secret (the QR key, or the SPAKE2 secret),
+salt = device salt ‖ phone salt, info `qrkb/p2d/v2` (phone to device) and
+`qrkb/d2p/v2` (device to phone). Plaintext: `10 | UTF-8 JSON`. Message types:
 
 - `key`: `{ type, id, text }` or `{ type, id, code }`; Backspace may include a
   `count` (expanded into individual events, capped at 10000).
@@ -194,8 +241,6 @@ New plaintext: `10 | UTF-8 JSON`. Message types:
 - `finish`: `{ type, id }`.
 - `ack`: `{ type, id, ok }` (screen to phone).
 
-The SDK continues to decode older binary `KEY` (`04`), `BUTTON` (`02`), `MOVE`
-(`01`), `SCROLL` (`03`), and `SETTLE` (`05`) frames for custom clients. Those legacy
-frames do not carry acknowledgement IDs. Pointer/scroll interfaces are not
-features of the current hosted phone keyboard. Local design experiments and
-historical plans are kept separately from this API.
+Protocol 2 replaced the earlier binary `KEY`/`BUTTON`/`MOVE`/`SCROLL`/`SETTLE`
+payloads; the SDK no longer decodes them. Pointer/scroll interfaces are not
+features of the current hosted phone keyboard.

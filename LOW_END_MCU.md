@@ -13,15 +13,20 @@ handling. QRKeyboard does not ship firmware, bridges, or a USB-HID injector.
 - A Cloudflare HTTPS/WebSocket API for creating and connecting sessions.
 - Owner-token authentication and hashed phone reconnect credentials.
 - QR rendering as SVG, PNG, or a plain `0`/`1` bitmap grid.
-- Single-socket provisioning that returns a new code, owner token, and QR grid.
+- Single-socket provisioning that returns a new code and owner token, plus a QR
+  grid for PIN instances.
 - A hosted phone keyboard using live text, message entry, or named actions.
 - Endpoint AES-256-GCM encryption, directional HKDF keys, and optional SPAKE2 PIN
   pairing in the browser implementation.
 
-Provisioning and raw server QRs contain the join code alone. They do not supply a
-secret endpoint encryption key. Firmware must implement a compatible pairing
-path: generate a key and assemble a QR fragment, or implement PIN pairing. The
-browser SDK already does this for web screens.
+Provisioning and raw server QRs contain the join code alone, so the relay issues
+them only for PIN instances (`/provision?pin=1&protocol=2`, or `pinRequired: true`
+with `POST /i`). For no-PIN pairing the firmware generates the 32-byte key and
+draws its own QR of `joinUrl` + `&k=<base64url key>`; the relay never sees that
+key. Either way the firmware implements protocol 2 pairing and framing as
+described in the [API reference](DEVELOPER_GUIDE.md#advanced-application-messages-and-compatibility):
+per-connection salts, SPAKE2 for PIN mode, counter nonces. The browser SDK
+already does this for web screens.
 
 ## Hardware choices
 
@@ -37,7 +42,7 @@ implement endpoint pairing or end-to-end encryption.
 
 ## Minimal device lifecycle
 
-1. Create an instance through `POST /i` or `/provision`.
+1. Create an instance through `POST /i` or `/provision`, declaring `protocol` 2.
 2. Establish endpoint encryption and display the resulting usable QR with
    **Scan with your phone camera to type here**.
 3. Connect as device using the owner token and participate in pairing.
@@ -46,9 +51,9 @@ implement endpoint pairing or end-to-end encryption.
 6. On Finish, clear visitor state, call the authenticated end endpoint, and create
    a new instance/key before showing the next QR.
 
-Legacy binary input is still decoded by the browser SDK, but the current hosted
-phone uses the acknowledged application-message protocol. See the
-[API reference](DEVELOPER_GUIDE.md) for wire formats and frame limits.
+Send a `k` text message every 25 seconds to keep the connection warm; the relay
+answers it without waking the session. See the [API reference](DEVELOPER_GUIDE.md)
+for wire formats and frame limits.
 
 ## Separate approaches you would have to build
 

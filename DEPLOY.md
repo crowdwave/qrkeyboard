@@ -18,6 +18,10 @@ The inline starter script also needs your CSP's nonce/hash, or move it into an
 allowed JavaScript file. No origin registration is needed; the API supports
 cross-origin browser integration.
 
+For production you can pin an exact SDK build with Subresource Integrity instead
+of the always-latest `/v1.js`; see
+[Pin a version](DEVELOPER_GUIDE.md#pin-a-version-for-production).
+
 ## Need a host? Upload a folder
 
 Put only your public app files in a folder named `site`, with `index.html` at its
