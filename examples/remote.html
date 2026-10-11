@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone remote — TV menu</title>
+<style>
+  body { font: 18px/1.5 system-ui; margin: 0; padding: 32px; background: #101418; color: #eef2f5; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 32px; max-width: 1100px; margin: auto; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .tile { aspect-ratio: 16 / 9; border-radius: 10px; display: grid; place-items: end start; padding: 10px; background: #1f2830; font-weight: 600; outline: 3px solid transparent; transition: transform .12s, outline-color .12s; }
+  .tile.focus { outline-color: #ffd36b; transform: scale(1.06); }
+  .tile.open { background: #3a6ff0; }
+  #volume { height: 8px; border-radius: 4px; background: #2a333b; overflow: hidden; }
+  #volume span { display: block; height: 100%; background: #ffd36b; }
+  .qrkeyboard-code svg { width: 100%; height: auto; display: block; background: #fff; }
+  @media (max-width: 700px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>Channels</h1>
+    <div class="tiles" id="tiles"></div>
+    <p>Volume</p>
+    <div id="volume"><span id="level"></span></div>
+    <p id="last" role="status">Use the D-pad on your phone.</p>
+  </section>
+  <aside><div id="qr"></div></aside>
+</main>
+<script src="https://qrkeyboard.com/v1.js"></script>
+<script>
+  const COLUMNS = 4;
+  const names = ['News', 'Sport', 'Films', 'Kids', 'Music', 'Weather', 'Travel', 'Cooking', 'Science', 'Gardens', 'Comedy', 'Classics'];
+  const tiles = names.map(name => {
+    const tile = document.createElement('div'); tile.className = 'tile'; tile.textContent = name;
+    document.getElementById('tiles').appendChild(tile); return tile;
+  });
+  let focus = 0, volume = 40;
+  const show = () => {
+    tiles.forEach((tile, index) => tile.classList.toggle('focus', index === focus));
+    document.getElementById('level').style.width = volume + '%';
+  };
+
+  // layout: 'remote' gives the phone a D-pad, Back/Home/Menu, volume, channel and colour keys.
+  const keyboard = QRKeyboard.create({ el: '#qr', name: 'Living room TV', layout: 'remote' });
+
+  // keydown repeats while a key marked "repeat" is held (arrows, volume, channel).
+  keyboard.on('keydown', ({ key }) => {
+    const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -COLUMNS, ArrowDown: COLUMNS };
+    if (key in moves) focus = Math.min(tiles.length - 1, Math.max(0, focus + moves[key]));
+    if (key === 'AudioVolumeUp') volume = Math.min(100, volume + 4);
+    if (key === 'AudioVolumeDown') volume = Math.max(0, volume - 4);
+    if (key === 'ChannelUp' || key === 'ChannelDown') focus = (focus + (key === 'ChannelUp' ? 1 : tiles.length - 1)) % tiles.length;
+    show();
+  });
+  // press fires once per key, for one-shot actions.
+  keyboard.on('press', ({ key, label }) => {
+    if (key === 'Enter') tiles[focus].classList.add('open');
+    if (key === 'BrowserBack') tiles.forEach(tile => tile.classList.remove('open'));
+    document.getElementById('last').textContent = 'Last key: ' + label;
+  });
+  keyboard.on('finish', () => { focus = 0; volume = 40; tiles.forEach(tile => tile.classList.remove('open')); show(); });
+  show();
+</script>
+</body>
+</html>

@@ -26,6 +26,7 @@ an unpublished local build.
 | [web-basic.html](web-basic.html) | Live entry plus an explicit screen Finish button | Updated lifecycle |
 | [message.html](message.html) | Compose a message, then Send | Updated message protocol |
 | [presentation.html](presentation.html) | PIN, Previous slide, Next slide | Updated named actions |
+| [remote.html](remote.html) | D-pad, OK, volume and channel on a TV-style menu | Protocol 3 controls |
 
 Check [release status](../RELEASE_STATUS.md) before trying the updated features.
 To publish an example as your own app, copy it to a public folder as `index.html`

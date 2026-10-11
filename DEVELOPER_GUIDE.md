@@ -60,7 +60,8 @@ before then.
 | `pin` | none | `true` generates/displays a PIN; a string sets one |
 | `region` | automatic | Optional relay placement hint: `wnam`, `enam`, `sam`, `weur`, `eeur`, `apac`, `oc`, `afr`, `me`; any other value is rejected |
 | `cellSize`, `margin` | `4`, `4` | QR rendering options |
-| `target` | none | Advanced: dispatch synthetic keydown events to this element; does not insert text automatically |
+| `layout` | none | Phone controls: `'keyboard'`, `'buttons'`, `'remote'`, `'teletext'`, `'gamepad'`, or a list of blocks; see [Controls](#controls-remotes-keypads-and-game-buttons) |
+| `target` | none | Advanced: dispatch synthetic `keydown` (and, for layout keys, `keyup`) events to this element; does not insert text automatically |
 
 Buttons-only setup uses `caps: ['buttons']`. Without explicit action labels,
 buttons are named **Previous** and **Next**. Prefer labels specific to your app.
@@ -96,6 +97,9 @@ any downstream effect the handler neglected to await.
 | `pinfail` | `{ attemptsLeft }` | A PIN attempt ended without pairing (wrong PIN, or the phone left mid-check) |
 | `locked` | `{}` | Five PIN attempts without pairing; create a fresh session |
 | `error` | Error | Network, input-handler, pairing, or reset failure |
+| `press` | `{ key, label, id }` | A layout key went down (once per press) |
+| `keydown` | `{ key, repeat, id }` | A layout key went down; repeats with `repeat: true` while a `repeat` key is held |
+| `keyup` | `{ key, id }` | A layout key was released |
 
 Special key codes: `8` Backspace, `9` Tab, `10` Enter, `27` Escape, `37–40` arrows.
 In live mode the phone diffs committed text and emits suffix backspaces/text.
@@ -114,6 +118,70 @@ Register the handler matching the mode: `key` for live typing, `text` for comple
 messages, `action` for named buttons. Setting `mode: 'text'` alone is insufficient
 if your app only listens for `key`. The [examples](examples/README.md) show all
 three working setups.
+
+## Controls: remotes, keypads and game buttons
+
+Set `layout` to give the phone more than a keyboard. Use a preset, or compose
+your own from three primitives. Input only travels from the phone to the screen.
+
+```js
+const keyboard = QRKeyboard.create({ el: '#qr', name: 'Living room TV', layout: 'remote' });
+keyboard.on('press', ({ key }) => { if (key === 'Enter') openSelected(); });
+keyboard.on('keydown', ({ key }) => { if (key === 'ArrowDown') moveFocus(+1); }); // repeats while held
+```
+
+| Preset | Phone shows |
+|---|---|
+| `keyboard` | The text entry (the default) |
+| `buttons` | Your named `actions`, one per row |
+| `remote` | D-pad with OK; Back, Home, Menu; Vol −, Mute, Vol +; Ch −, Play/Pause, Ch +; four colour keys |
+| `teletext` | Four colour keys; digits 0–9 with Text and TV; Sub −, Page −, Page +, Sub + |
+| `gamepad` | D-pad with OK; A and B |
+
+Your own layout is a list of up to 6 blocks:
+
+```js
+layout: [
+  { type: 'dpad', repeat: true },
+  { type: 'keys', columns: 3, keys: [
+    { key: 'MediaRewind' }, { key: 'MediaPlayPause' }, { key: 'MediaFastForward' },
+    { key: 'action:like', label: 'Like', tone: 'accent' },
+  ] },
+  { type: 'text' },
+]
+```
+
+- `{ type: 'text' }`: the text entry, using `mode` and `submitLabel`. At most one.
+- `{ type: 'dpad', repeat }`: arrows and OK, sent as `ArrowUp`, `ArrowDown`,
+  `ArrowLeft`, `ArrowRight` and `Enter`. `repeat: true` repeats the arrows while held.
+- `{ type: 'keys', columns, keys }`: a grid of 1 to 20 keys, `columns` 1–5. Each key
+  has a `key`, an optional `label` (up to 20 characters), an optional `tone`
+  (`plain`, `accent`, `red`, `green`, `yellow`, `blue`) and an optional `repeat`.
+
+A key is one of:
+
+- A standard key value from the [W3C UI Events key list](https://www.w3.org/TR/uievents-key/):
+  `ArrowUp` `ArrowDown` `ArrowLeft` `ArrowRight` `Enter` `Backspace` `Escape`
+  `ContextMenu` `Power` `ChannelUp` `ChannelDown` `MediaPlayPause` `MediaStop`
+  `MediaRewind` `MediaFastForward` `MediaTrackPrevious` `MediaTrackNext`
+  `AudioVolumeUp` `AudioVolumeDown` `AudioVolumeMute` `BrowserBack` `BrowserHome`
+  `ColorF0Red` `ColorF1Green` `ColorF2Yellow` `ColorF3Blue` `Teletext` `Info`
+  `Guide` `Exit` `Settings` `Subtitle`. Colour keys are coloured automatically.
+- One printable character, such as `'a'` or `'7'`.
+- `'action:<id>'` for one of your `actions`; it raises the `action` event as before.
+
+Each key appears once per layout, and a layout holds at most 40 keys. The relay
+rejects any layout outside these rules with a 400 that names the problem.
+
+Every press sends the key down and, on release, up. The SDK raises `press` and
+`keydown`, repeats `keydown` (after 400 ms, every 80 ms) for keys marked `repeat`,
+and raises `keyup` on release. A held key is released if the phone disconnects
+or after 15 seconds without a release. With `target`, the same keys arrive as
+ordinary `keydown`/`keyup` events, so an existing TV web app that already handles
+remote keys needs no QRKeyboard-specific code.
+
+The phone confirms each key with a brief glow when the screen's handler has
+finished; failures are reported on the phone. Layouts need the protocol 3 SDK.
 
 ## Session lifecycle
 
@@ -161,8 +229,9 @@ access against people who can read both.
 
 `POST /i` with JSON configuration (`caps`, `name`, `mode`, `submitLabel`, `actions`,
 `pinRequired`, `protocol`, optional `region`) returns `code`, `joinUrl`,
-`ownerToken`, `qrUrl`, and the device-role `relay` URL. Set `protocol: 2`; the
-hosted phone refuses screens that do not declare a protocol it supports. Creation
+`ownerToken`, `qrUrl`, and the device-role `relay` URL. Set `protocol: 3` (or 2,
+without layouts); the hosted phone refuses screens that do not declare a protocol
+it supports. Configuration bodies are limited to 16 KiB. Creation
 is limited to 20 requests per client per minute (IPv6 clients are counted per
 /64). Store the owner token privately. The raw API does not generate an endpoint
 key. To use the hosted phone page, implement key generation/QR assembly or PIN
@@ -212,7 +281,7 @@ new instance rather than reusing an ended code.
 
 ### Provision a device over one socket
 
-`/provision?protocol=2` allocates an instance and pushes a JSON `provision`
+`/provision?protocol=3` allocates an instance and pushes a JSON `provision`
 message containing `code`, `joinUrl` and `ownerToken`, followed by `ready`. Add
 `pin=1` for a PIN instance; only then does the message also carry `qr`, a bit
 grid of the join URL, because only a PIN QR works without a key the device adds
@@ -222,7 +291,7 @@ ready-made phone keyboard for an arbitrary MCU. See [embedded guidance](LOW_END_
 
 ## Advanced: application messages and compatibility
 
-Protocol 2 frames, each a binary WebSocket message:
+Protocol 2 and 3 frames, each a binary WebSocket message:
 
 - `e3 | 16-byte salt`: sent by both endpoints when the peer is reported up.
 - `e0 | 65-byte SPAKE2 share` and `e2 | 32-byte confirmation`: PIN mode only.
@@ -238,8 +307,14 @@ salt = device salt ‖ phone salt, info `qrkb/p2d/v2` (phone to device) and
   `count` (expanded into individual events, capped at 10000).
 - `text`: `{ type, id, text }`.
 - `action`: `{ type, id, action }` (configured action ID).
+- `down` / `up`: `{ type, id, key }`, protocol 3 layout keys (`action:<id>` keys
+  included). Keys not in the screen's layout are ignored.
 - `finish`: `{ type, id }`.
-- `ack`: `{ type, id, ok }` (screen to phone).
+- `ack`: `{ type, id, ok }` (screen to phone, the only message in that direction).
+
+Protocol 3 adds `layout` and the `down`/`up` messages. The phone still serves
+protocol 2 screens, rendering their keyboard and `actions` and sending `action`
+messages, so pinned protocol 2 SDK files keep working.
 
 Protocol 2 replaced the earlier binary `KEY`/`BUTTON`/`MOVE`/`SCROLL`/`SETTLE`
 payloads; the SDK no longer decodes them. Pointer/scroll interfaces are not

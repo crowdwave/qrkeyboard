@@ -113,13 +113,17 @@ Use a complete example rather than adding options without an input handler:
 | Typing appears immediately | [Starter](examples/index.html) | `key` |
 | Write, review, then Send | [Message entry](examples/message.html) | `text` |
 | Previous / Next slide | [Presentation](examples/presentation.html) | `action` |
+| A TV-style remote | [TV remote](examples/remote.html) | `press`, `keydown` |
 
 For message entry, set `mode: 'text'`. Label its action with `submitLabel: 'Search'`
 or `'Send'`, and give the destination a useful `name`. The phone displays **Sent**
 after your handler completes; return a Promise to await a save or search.
 
 For buttons, supply named `actions`; use `caps: ['buttons']` if you do not need a
-keyboard. For a PIN, add `pin: true`; the generated PIN appears beside the QR.
+keyboard. For a remote control, set `layout: 'remote'` (or `'teletext'`,
+`'gamepad'`) and handle `press` and `keydown`; see
+[Controls](DEVELOPER_GUIDE.md#controls-remotes-keypads-and-game-buttons). For a PIN,
+add `pin: true`; the generated PIN appears beside the QR.
 
 On a shared screen, clear visitor data in the `finish` handler. **Finish** ends
 the old pairing and creates a fresh QR after cleanup. **Disconnect** only stops

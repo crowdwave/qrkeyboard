@@ -57,16 +57,17 @@ include a drag-and-drop path and a CLI path.
 | Live field entry | Type and see edits immediately | [Starter](examples/index.html) |
 | TV search or kiosk message | Compose, then Search / Send | [Message entry](examples/message.html) |
 | Presentation | Previous slide / Next slide | [Presentation](examples/presentation.html) |
+| TV, set-top or kiosk navigation | Remote with D-pad, volume, channel, colour keys | [TV remote](examples/remote.html) |
 
-Message entry and named actions require the updated hosted service. Start with
-the live keyboard example while that release is pending.
+Message entry, named actions and remote controls require the updated hosted
+service. Start with the live keyboard example while that release is pending.
 
 ## Where to go next
 
 - [Quick start](QUICKSTART.md): from an empty folder to your first working page.
 - [Deploy your page](DEPLOY.md): publish it and verify the result.
 - [Example guide](examples/README.md): runnable files and how to choose one.
-- [API reference](DEVELOPER_GUIDE.md): options, events, delivery, and session cleanup.
-- [Use cases](USE_CASES.md): the three interaction patterns.
+- [API reference](DEVELOPER_GUIDE.md): options, events, controls, delivery, and session cleanup.
+- [Use cases](USE_CASES.md): the interaction patterns.
 - [Embedded devices](LOW_END_MCU.md): advanced firmware/bridge integration.
 - [Release status](RELEASE_STATUS.md): implemented versus deployed behaviour.

@@ -20,10 +20,10 @@ handling. QRKeyboard does not ship firmware, bridges, or a USB-HID injector.
   pairing in the browser implementation.
 
 Provisioning and raw server QRs contain the join code alone, so the relay issues
-them only for PIN instances (`/provision?pin=1&protocol=2`, or `pinRequired: true`
+them only for PIN instances (`/provision?pin=1&protocol=3`, or `pinRequired: true`
 with `POST /i`). For no-PIN pairing the firmware generates the 32-byte key and
 draws its own QR of `joinUrl` + `&k=<base64url key>`; the relay never sees that
-key. Either way the firmware implements protocol 2 pairing and framing as
+key. Either way the firmware implements the pairing and framing (unchanged in protocol 3) as
 described in the [API reference](DEVELOPER_GUIDE.md#advanced-application-messages-and-compatibility):
 per-connection salts, SPAKE2 for PIN mode, counter nonces. The browser SDK
 already does this for web screens.
@@ -42,11 +42,13 @@ implement endpoint pairing or end-to-end encryption.
 
 ## Minimal device lifecycle
 
-1. Create an instance through `POST /i` or `/provision`, declaring `protocol` 2.
+1. Create an instance through `POST /i` or `/provision`, declaring `protocol` 3.
 2. Establish endpoint encryption and display the resulting usable QR with
    **Scan with your phone camera to type here**.
 3. Connect as device using the owner token and participate in pairing.
-4. Decrypt and handle `key`, `text`, or `action` messages.
+4. Decrypt and handle `key`, `text`, `action`, or (with a `layout`) `down`/`up`
+   messages. A bridge that drives a real TV can map remote-layout keys such as
+   `ChannelUp` or `ColorF0Red` to IR codes or HDMI-CEC commands.
 5. Send an encrypted `ack` only after handling the input.
 6. On Finish, clear visitor state, call the authenticated end endpoint, and create
    a new instance/key before showing the next QR.
