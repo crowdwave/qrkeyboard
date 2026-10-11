@@ -21,6 +21,7 @@ its reachability/version could not be verified during this documentation review.
 | Message-length budget shown while typing | Implemented | Pending deployment |
 | Server QR and provisioning QR only for PIN instances | Implemented | Pending deployment |
 | Protocol 3 controls: `layout`, remote / teletext / gamepad presets, key down/up | Implemented | Pending deployment |
+| Hosted examples and billboard demos under `/examples/` | Implemented | Pending deployment |
 
 The [starter](examples/index.html) explicitly requests the keyboard and handles
 live `key` events, so it uses the earlier API. With an earlier deployment, the

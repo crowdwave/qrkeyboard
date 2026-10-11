@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billboard Demos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anybody:wdth,wght@75..150,500..900&family=Instrument+Sans:wght@400;600&display=swap">
+<style>
+/* A poster wall: six screens, each card painted in its own demo's world.
+   The page itself stays quiet and dark so the posters carry the colour. */
+:root {
+  color-scheme: dark;
+  --wall: #0b0b0d;
+  --paste: #16161a;
+  --ink: #f2f0ea;
+  --muted: #a3a09a;
+  --line: #2a2a30;
+  --link: #ffd36b;
+  --display: "Anybody", "Arial Black", sans-serif;
+  --body: "Instrument Sans", "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--wall); color: var(--ink); font: 17px/1.55 var(--body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 64px; }
+header { display: grid; gap: 14px; max-width: 760px; margin-bottom: 36px; }
+h1 { margin: 0; font: 900 clamp(44px, 8vw, 104px)/.88 var(--display); font-stretch: 140%; letter-spacing: -.02em; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 62ch; }
+.how { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 6px 0 0; padding: 0; list-style: none; color: var(--ink); font-weight: 600; }
+.how li { display: flex; gap: 8px; align-items: baseline; }
+.how b { font: 800 14px/1 var(--display); color: var(--wall); background: var(--link); border-radius: 999px; padding: 4px 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 22px; }
+.poster { display: grid; grid-template-rows: auto 1fr; min-width: 0; background: var(--paste); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; color: inherit; text-decoration: none; transition: transform .18s ease, border-color .18s; }
+.poster:hover, .poster:focus-visible { transform: translateY(-4px); border-color: var(--link); outline: none; }
+.art { position: relative; aspect-ratio: 16 / 9; max-width: 100%; display: grid; place-items: center; overflow: hidden; }
+.art span { position: relative; text-align: center; padding: 0 12px; }
+.meta { display: grid; gap: 6px; padding: 16px 18px 18px; }
+.meta h2 { margin: 0; font: 800 26px/1 var(--display); font-stretch: 115%; }
+.meta p { margin: 0; color: var(--muted); font-size: 15px; }
+.chip { justify-self: start; margin-top: 4px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--link); }
+
+/* Each poster borrows its demo's materials. */
+.neon { background: repeating-linear-gradient(0deg, #2a1218 0 22px, #120a0c 22px 25px), #120a0c; }
+.neon span { font: 400 46px/1 "Tilt Neon", cursive; color: #ffe3f1; text-shadow: 0 0 8px #ff4fa3, 0 0 26px #ff4fa3, 0 0 60px #ff4fa3; }
+.sky { background: linear-gradient(#050818, #22134a 70%, #05040d 70%); }
+.sky::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 38%, #ffcf4a 0 2px, #0000 3px), radial-gradient(circle at 50% 38%, #ffcf4a55 0, #0000 34%); }
+.sky span { font: 900 34px/1 var(--display); letter-spacing: .1em; color: #ffcf4a; text-shadow: 0 0 18px #ff8a3d; }
+.trail { background: radial-gradient(circle, #1b1b20 1.6px, #0000 2px) 0 0 / 14px 14px, #050506; }
+.trail span { font: 900 32px/1 var(--display); color: #ffb020; text-shadow: 0 0 14px #ffb020; letter-spacing: .08em; }
+.board { background: #0b0c0d; }
+.board span { font: 800 34px/1 "Big Shoulders Text", "Arial Narrow", sans-serif; letter-spacing: .3em; color: #f1efe7; background: repeating-linear-gradient(90deg, #2c3034 0 0.9em, #0b0c0d 0.9em 1em); padding: 10px 6px 10px 14px; }
+.mural { background: radial-gradient(120% 90% at 20% 30%, #1fa3c4aa, #0000 55%), radial-gradient(90% 80% at 80% 70%, #e0401a99, #0000 60%), radial-gradient(70% 60% at 60% 20%, #9b6bff77, #0000 60%), #07070c; }
+.mural span { font: 900 48px/1 var(--display); font-stretch: 75%; color: #fff; }
+.ttx { background: #000; }
+.ttx span { font: 400 30px/1.1 "VT323", monospace; color: #ff2; }
+.ttx span i { font-style: normal; display: block; color: #2ff; font-size: 22px; }
+.starters { margin-top: 48px; padding-top: 28px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.starters h2 { margin: 0; font: 800 28px/1 var(--display); }
+.starters ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 10px 24px; }
+.starters a { color: var(--link); }
+@media (prefers-reduced-motion: reduce) { .poster { transition: none; } .poster:hover { transform: none; } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tilt+Neon&family=Big+Shoulders+Text:wght@800&family=VT323&display=swap">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Billboard demos</h1>
+    <p class="lede">Big-screen experiences driven from a phone. Open one on a TV, projector or second monitor, then scan its code with your phone camera. Nothing to install. Each visitor takes a turn; Finish hands the screen to the next person.</p>
+    <ol class="how">
+      <li><b>1</b> Open a demo on a big screen</li>
+      <li><b>2</b> Scan the code on it</li>
+      <li><b>3</b> Play from your phone</li>
+    </ol>
+  </header>
+  <main class="grid">
+    <a class="poster" href="neon.html"><div class="art neon"><span>Hello</span></div><div class="meta"><h2>Neon Wall</h2><p>Type on your phone and your words light up as flickering neon on a night-time brick wall.</p><span class="chip">Live keyboard · colour buttons</span></div></a>
+    <a class="poster" href="skywriter.html"><div class="art sky"><span>LAUNCH</span></div><div class="meta"><h2>Skywriter</h2><p>Write a few words and launch them: a rocket climbs over the skyline and bursts into your message.</p><span class="chip">Message · Launch</span></div></a>
+    <a class="poster" href="light-trail.html"><div class="art trail"><span>RIDE</span></div><div class="meta"><h2>Light Trail</h2><p>An LED stadium-board light-cycle duel. Turn left and right from your phone and outlast two bots.</p><span class="chip">Turn buttons</span></div></a>
+    <a class="poster" href="departures.html"><div class="art board"><span>NOW</span></div><div class="meta"><h2>Departures</h2><p>Post a message and watch it clatter onto a split-flap station board.</p><span class="chip">Message · Post</span></div></a>
+    <a class="poster" href="mural.html"><div class="art mural"><span>Flow</span></div><div class="meta"><h2>Flow Mural</h2><p>A living generative painting. Choose its mood from your phone: ocean, ember, aurora, bloom or storm.</p><span class="chip">Mood buttons</span></div></a>
+    <a class="poster" href="teletext.html"><div class="art ttx"><span>P100 QRTEXT<i>key a page</i></span></div><div class="meta"><h2>QRTEXT</h2><p>A teletext service with your phone as the remote: page numbers, Fastext colour keys and subpages.</p><span class="chip">Teletext remote</span></div></a>
+  </main>
+  <section class="starters" aria-labelledby="starters">
+    <h2 id="starters">Building your own?</h2>
+    <p class="lede">Start from a small example, then read the quick start.</p>
+    <ul>
+      <li><a href="../index.html">Live typing starter</a></li>
+      <li><a href="../message.html">Message entry</a></li>
+      <li><a href="../presentation.html">Presentation buttons</a></li>
+      <li><a href="https://github.com/crowdwave/qrkeyboard/blob/main/QUICKSTART.md">Quick start</a></li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>

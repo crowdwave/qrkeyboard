@@ -40,6 +40,14 @@ keys. Keys arrive as standard key names (`ArrowDown`, `ChannelUp`, `ColorF0Red`)
 with `target`, as ordinary keyboard events the app may already handle. The
 `teletext` preset adds a number pad for page entry.
 
+## Digital billboards
+
+A billboard shows its QR beside the artwork. One visitor at a time takes a turn:
+types a message, launches something, or plays a game with remote or game keys.
+The screen ends idle turns with `finish()` so the next visitor gets a fresh code.
+Public screens show what visitors type, so plan moderation for the audience.
+See the [billboard demos](examples/billboards/index.html).
+
 ## Picking a mode
 
 | Need | Use |

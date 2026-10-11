@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QRTEXT Teletext</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+<style>
+/* A CRT in a dark room: a 40×25 teletext page at 4:3, a remote-pairing card beside it.
+   Teletext's own eight colours are the palette. Single dark look. */
+:root {
+  color-scheme: dark;
+  --room: #050505;
+  --black: #000000;
+  --red: #ff2a2a;
+  --green: #2aff2a;
+  --yellow: #ffff2a;
+  --blue: #2a4bff;
+  --magenta: #ff2aff;
+  --cyan: #2affff;
+  --white: #ffffff;
+  --cell: "VT323", "Courier New", monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--room); color: var(--white); font-family: var(--cell); overflow: hidden;
+  display: grid; grid-template-columns: minmax(0, 1fr) clamp(220px, 24vw, 380px); gap: 3vmin; padding: 3vmin; align-items: center;
+}
+.crt {
+  position: relative; justify-self: center; width: min(100%, calc((100vh - 6vmin) * 4 / 3)); aspect-ratio: 4 / 3;
+  background: var(--black); border-radius: 3.2% / 4.2%; overflow: hidden;
+  box-shadow: 0 0 0 1.4vmin #151515, 0 0 0 1.6vmin #2a2a2a, 0 3vmin 8vmin #000;
+}
+.page {
+  position: absolute; inset: 3% 2.5%; display: grid; grid-template-rows: repeat(25, 1fr);
+  font-size: var(--cell-size, 20px); line-height: 1;
+}
+.row { display: grid; grid-template-columns: repeat(40, 1fr); white-space: pre; }
+.row span { display: flex; align-items: center; justify-content: center; }
+.double { transform: scaleY(2); transform-origin: top; }
+/* Scanlines and a little bloom sell the tube without hurting legibility. */
+.crt::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, #0000 0 2px, #00000038 2px 3px);
+  box-shadow: inset 0 0 12vmin #000a;
+}
+.card { display: grid; gap: 1.4vmin; padding: 2.4vmin; background: #0d0d0d; border: 2px solid var(--blue); }
+.card h2 { margin: 0; font-size: clamp(22px, 4.4vmin, 60px); line-height: .9; color: var(--yellow); }
+.card p { margin: 0; font-size: clamp(16px, 2.6vmin, 30px); line-height: 1.05; color: var(--cyan); }
+.qrkeyboard-pairing { display: grid; gap: 1vmin; }
+.qrkeyboard-pairing p { margin: 0; font-size: clamp(15px, 2.3vmin, 28px); color: var(--white); }
+.qrkeyboard-pairing [role="status"] { color: var(--green); }
+.qrkeyboard-code { background: #fff; }
+.qrkeyboard-code svg { width: 100%; height: auto; display: block; }
+.qrkeyboard-pairing button { font: inherit; padding: .3em 1em; border: 0; background: var(--yellow); color: var(--black); }
+</style>
+</head>
+<body>
+<div class="crt" id="crt" aria-label="Teletext page"><div class="page" id="page"></div></div>
+<aside class="card" aria-live="polite">
+  <h2 id="headline">Your phone is the remote</h2>
+  <p id="hint">Scan, then key a page number. Try 100, 200 or 500.</p>
+  <div id="qr"></div>
+</aside>
+<script src="https://qrkeyboard.com/v1.js"></script>
+<script>
+const TURN_MS = 4 * 60 * 1000;
+const IDLE_MS = 60 * 1000;
+const SUBPAGE_ROTATE_MS = 12 * 1000;   // teletext carousels advance by themselves
+const ATTRACT_PAGES = [100, 200, 300, 500, 101];
+const ATTRACT_EVERY_MS = 9000;
+const COLUMNS = 40, ROWS = 25;
+const COLOURS = { k: 'var(--black)', r: 'var(--red)', g: 'var(--green)', y: 'var(--yellow)', b: 'var(--blue)', m: 'var(--magenta)', c: 'var(--cyan)', w: 'var(--white)' };
+
+const keyboard = QRKeyboard.create({ el: '#qr', name: 'QRTEXT teletext', layout: 'teletext' });
+
+// Page markup: {x} sets the foreground colour, {x/} the background, {2} makes
+// the row double height. Fastext links: [red, green, yellow, blue] → page numbers.
+const PAGES = {
+  100: { fastext: [101, 200, 300, 500], sub: [[
+    '{2}{b/}{y} QRTEXT              {w}the billboard',
+    '',
+    '{c}  Your phone is the remote control.',
+    '{w}  Key a three-digit page number.',
+    '',
+    '{y}  101 {w}How this works',
+    '{y}  200 {w}Weather around the billboard',
+    '{y}  300 {w}Billboard games',
+    '{y}  400 {w}Word of the day',
+    '{y}  500 {w}Quiz  {c}(blue key reveals)',
+    '{y}  888 {w}Test page',
+    '',
+    '{g}  Page + / Page -  step through pages',
+    '{g}  Sub + / Sub -    step through subpages',
+    '{g}  TV                switch to television',
+  ]] },
+  101: { fastext: [100, 200, 300, 500], sub: [
+    ['{2}{r/}{w} HOW THIS WORKS                1/3', '', '{w} This page is served by a web page on', '{w} the screen. Your phone scanned its QR', '{w} and opened a remote control.', '', '{c} Nothing is installed. The keys you', '{c} press travel encrypted to the screen.'],
+    ['{2}{r/}{w} HOW THIS WORKS                2/3', '', '{w} Every key is a standard key name:', '{y}   ColorF0Red  ChannelUp  Teletext', '', '{w} so an existing TV app can listen for', '{w} ordinary keyboard events.'],
+    ['{2}{r/}{w} HOW THIS WORKS                3/3', '', '{w} When you are finished, tap Finish on', '{w} your phone. The screen clears and a', '{w} fresh QR appears for the next person.'],
+  ] },
+  200: { fastext: [100, 101, 300, 500], sub: [[
+    '{2}{g/}{k} WEATHER                demo forecast',
+    '',
+    '{c}            .--.',
+    '{c}         .-(    ).    {y}  NORTH   {w}19°',
+    '{c}        (___.__)__)   {y}  CITY    {w}22°',
+    '{b}          / / / /     {y}  COAST   {w}24°',
+    '{y}     \\\\  |  //          {y}  HILLS   {w}16°',
+    '{y}    -- ( O ) --',
+    '{y}     //  |  \\\\        {g}  Showers clearing',
+    '{g}                      {g}  by the afternoon.',
+    '',
+    '{m}  Demo data, not a real forecast.',
+  ]] },
+  300: { fastext: [100, 101, 200, 500], sub: [[
+    '{2}{m/}{w} BILLBOARD GAMES',
+    '',
+    '{w}  Other screens in this collection:',
+    '',
+    '{y}  Neon Wall    {c}type in neon tubes',
+    '{y}  Skywriter    {c}launch your message',
+    '{y}  Light Trail  {c}outlast two bots',
+    '{y}  Departures   {c}post to the board',
+    '{y}  Flow Mural   {c}paint with moods',
+  ]] },
+  400: { fastext: [100, 101, 200, 500], sub: [
+    ['{2}{c/}{k} WORD OF THE DAY', '', '{y}  PETRICHOR', '', '{w}  The smell of rain falling on', '{w}  dry ground.'],
+    ['{2}{c/}{k} WORD OF THE DAY', '', '{y}  SONDER', '', '{w}  The feeling that every passer-by', '{w}  has a life as full as your own.'],
+  ] },
+  500: { fastext: [100, 101, 200, 'reveal'], sub: [[
+    '{2}{y/}{k} QUIZ                    blue reveals',
+    '',
+    '{w}  1. How many columns on a teletext',
+    '{w}     page?            {g}[40]',
+    '',
+    '{w}  2. Which key colour comes first',
+    '{w}     on a remote?     {g}[red]',
+    '',
+    '{w}  3. What does Fastext link to?',
+    '{w}                      {g}[other pages]',
+  ]] },
+  888: { fastext: [100, 101, 200, 500], sub: [[
+    '{2}{b/}{w} TEST PAGE',
+    '',
+    '{r/} {g/} {y/} {b/} {m/} {c/} {w/} {k/}',
+    '{r}RED {g}GREEN {y}YELLOW {b}BLUE {m}MAGENTA {c}CYAN',
+    '',
+    '{w}ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789',
+  ]] },
+};
+const PAGE_NUMBERS = Object.keys(PAGES).map(Number).sort((a, b) => a - b);
+const FASTEXT_COLOURS = ['r', 'g', 'y', 'b'];
+
+let current = 100, subpage = 0, entry = '', reveal = false, tvMode = false;
+let lastRotate = performance.now(), lastAttract = 0, turnStart = 0, lastInput = 0;
+
+function go(number) {
+  if (!PAGES[number]) { entry = ''; notFound = number; render(); return; }
+  current = number; subpage = 0; reveal = false; notFound = 0; tvMode = false; lastRotate = performance.now(); render();
+}
+let notFound = 0;
+
+keyboard.on('press', ({ key }) => {
+  lastInput = performance.now();
+  if (/^[0-9]$/.test(key)) {
+    tvMode = false;
+    entry = (entry + key).slice(-3);
+    if (entry.length === 3) { const number = Number(entry); entry = ''; go(number); } else render();
+    return;
+  }
+  const fastext = PAGES[current].fastext;
+  const colour = { ColorF0Red: 0, ColorF1Green: 1, ColorF2Yellow: 2, ColorF3Blue: 3 }[key];
+  if (colour !== undefined) {
+    const link = fastext[colour];
+    if (link === 'reveal') { reveal = !reveal; render(); } else go(link);
+  } else if (key === 'ChannelUp' || key === 'ChannelDown') {
+    const index = PAGE_NUMBERS.indexOf(current) + (key === 'ChannelUp' ? 1 : -1);
+    go(PAGE_NUMBERS[(index + PAGE_NUMBERS.length) % PAGE_NUMBERS.length]);
+  } else if (key === 'ArrowRight' || key === 'ArrowLeft') {
+    const count = PAGES[current].sub.length;
+    subpage = (subpage + (key === 'ArrowRight' ? 1 : count - 1)) % count; lastRotate = performance.now(); render();
+  } else if (key === 'Exit') { tvMode = true; render(); }
+  else if (key === 'Teletext') { tvMode = false; render(); }
+});
+// Page + / Page - auto-repeat while held; each repeat steps one page.
+keyboard.on('keydown', ({ key, repeat }) => {
+  if (repeat && (key === 'ChannelUp' || key === 'ChannelDown')) {
+    const index = PAGE_NUMBERS.indexOf(current) + (key === 'ChannelUp' ? 1 : -1);
+    go(PAGE_NUMBERS[(index + PAGE_NUMBERS.length) % PAGE_NUMBERS.length]);
+  }
+});
+keyboard.on('state', ({ state }) => {
+  const playing = state === 'connected';
+  if (playing && !turnStart) { turnStart = lastInput = performance.now(); go(100); }
+  document.getElementById('headline').textContent = playing ? 'Remote connected' : 'Your phone is the remote';
+  document.getElementById('hint').textContent = playing ? 'Key 3 digits, use the colour keys, or Page + / -.' : 'Scan, then key a page number. Try 100, 200 or 500.';
+});
+keyboard.on('finish', () => { turnStart = 0; go(100); });
+setInterval(() => {
+  const now = performance.now();
+  if (keyboard.state === 'connected' || keyboard.state === 'waiting') {
+    if (now - lastInput > IDLE_MS || now - turnStart > TURN_MS) keyboard.finish().catch(() => {});
+  } else if (now - lastAttract > ATTRACT_EVERY_MS) {
+    lastAttract = now; go(ATTRACT_PAGES[(ATTRACT_PAGES.indexOf(current) + 1) % ATTRACT_PAGES.length]);
+  }
+  if (now - lastRotate > SUBPAGE_ROTATE_MS && PAGES[current].sub.length > 1) {
+    subpage = (subpage + 1) % PAGES[current].sub.length; lastRotate = now;
+  }
+  render();
+}, 1000);
+
+// ── Rendering ───────────────────────────────────────────────────────────────
+const pageEl = document.getElementById('page');
+function parse(line) {
+  const cells = [];
+  let fg = 'w', bg = 'k', double = false;
+  for (const part of line.split(/(\{[a-z2]\/?\})/)) {
+    const token = part.match(/^\{([a-z2])(\/?)\}$/);
+    if (token) {
+      if (token[1] === '2') double = true;
+      else if (token[2]) bg = token[1]; else fg = token[1];
+      continue;
+    }
+    for (const char of part) cells.push({ char, fg, bg });
+  }
+  while (cells.length < COLUMNS) cells.push({ char: ' ', fg, bg });
+  return { cells: cells.slice(0, COLUMNS), double };
+}
+function header() {
+  const time = new Date().toTimeString().slice(0, 8);
+  const date = new Date().toDateString().slice(0, 10);
+  const shown = entry ? ('P' + entry.padEnd(3, '-')) : ('P' + current);
+  return `{w}${shown.padEnd(5)}{y}QRTEXT {w}${String(current).padEnd(4)}{c}${date} {y}${time}`;
+}
+function fastextRow() {
+  const labels = PAGES[current].fastext.map(link => link === 'reveal' ? (reveal ? 'Hide' : 'Reveal') : String(link));
+  return labels.map((label, index) => `{${FASTEXT_COLOURS[index]}}${label.padEnd(10)}`).join('');
+}
+function testCard() {
+  const bars = ['w', 'y', 'c', 'g', 'm', 'r', 'b', 'k'];
+  const rows = [];
+  for (let row = 0; row < 23; row++) rows.push(bars.map(colour => `{${colour}/}     `).join(''));
+  rows[11] = '{k/}{w}' + '        QRTEXT  ·  TV mode       '.padEnd(40);
+  rows[12] = '{k/}{y}' + '      Press Text to return       '.padEnd(40);
+  return rows;
+}
+function render() {
+  const sub = PAGES[current].sub[subpage] ?? [];
+  let lines = tvMode ? testCard() : sub.map(line => reveal ? line : line.replace(/\[[^\]]*\]/g, match => '[' + '?'.repeat(match.length - 2) + ']'));
+  if (notFound && !tvMode) lines = ['', '', `{r}  Page ${notFound} is not in service.`, '', '{w}  Try 100 for the index.'];
+  const rows = [header(), ...lines];
+  while (rows.length < ROWS - 1) rows.push('');
+  rows.length = ROWS - 1;
+  rows.push(tvMode ? '' : fastextRow());
+  pageEl.replaceChildren();
+  let skip = false;
+  for (const source of rows) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    if (skip) { skip = false; pageEl.appendChild(row); continue; }
+    const { cells, double } = parse(source);
+    if (double) { row.classList.add('double'); skip = true; }
+    for (const cell of cells) {
+      const span = document.createElement('span');
+      span.textContent = cell.char;
+      span.style.color = COLOURS[cell.fg];
+      span.style.background = COLOURS[cell.bg];
+      row.appendChild(span);
+    }
+    pageEl.appendChild(row);
+  }
+}
+function fit() {
+  const box = document.getElementById('crt').getBoundingClientRect();
+  pageEl.style.setProperty('--cell-size', (box.height * 0.94 / ROWS) * 1.05 + 'px');
+}
+addEventListener('resize', fit);
+document.fonts.load('20px VT323').finally(() => { fit(); render(); });
+</script>
+</body>
+</html>

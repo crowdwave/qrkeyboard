@@ -58,6 +58,7 @@ include a drag-and-drop path and a CLI path.
 | TV search or kiosk message | Compose, then Search / Send | [Message entry](examples/message.html) |
 | Presentation | Previous slide / Next slide | [Presentation](examples/presentation.html) |
 | TV, set-top or kiosk navigation | Remote with D-pad, volume, channel, colour keys | [TV remote](examples/remote.html) |
+| Digital billboard | Visitor takes a turn on a big screen | [Billboard demos](examples/billboards/index.html) |
 
 Message entry, named actions and remote controls require the updated hosted
 service. Start with the live keyboard example while that release is pending.
