@@ -27,7 +27,6 @@ This is the complete app. Copy it unchanged, or use the identical
   [hidden] { display: none; }
 </style>
 <h1>Type on your phone. See it here.</h1>
-<p>Scan with your phone camera to type here.</p>
 <div id="qr"></div>
 <p id="status" role="status">Waiting for your phone…</p>
 <pre id="text" aria-label="Text received from your phone"></pre>
@@ -117,7 +116,8 @@ Use a complete example rather than adding options without an input handler:
 
 For message entry, set `mode: 'text'`. Label its action with `submitLabel: 'Search'`
 or `'Send'`, and give the destination a useful `name`. The phone displays **Sent**
-after your handler completes; return a Promise to await a save or search.
+after your handler completes (keys and buttons glow instead); return a Promise
+to await a save or search.
 
 For buttons, supply named `actions`; use `caps: ['buttons']` if you do not need a
 keyboard. For a remote control, set `layout: 'remote'` (or `'teletext'`,
