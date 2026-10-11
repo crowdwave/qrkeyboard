@@ -67,16 +67,16 @@ variables or API secrets.
 
 | What you see | First thing to check |
 |---|---|
-| No QR; `QRKeyboard is not defined` | The `v1.js` script loaded before setup; check internet/CSP/ad blockers |
+| No QR; `QRKeyboard is not defined` | `v1.js` failed to load, or loaded after your setup script; check internet/CSP/ad blockers and script order |
 | Crypto/security error | Open the page over HTTPS, or locally at `http://127.0.0.1`; avoid a plain-HTTP LAN IP |
 | Phone cannot open the computer's localhost | Scan the generated QR; do not type the local development URL into the phone |
 | Connected but no text on screen | Live mode needs a `key` handler; message mode needs a `text` handler |
 | Named actions or message mode do nothing | Check whether the updated hosted service has been released |
-| Phone says the screen is in use | Disconnect or Finish on the existing phone before joining another |
+| Phone says the screen is in use | Disconnect or Finish on the existing phone. A phone that dropped keeps its place for 5 minutes; `finish()` on the screen clears it at once |
 | Creating sessions is rate-limited | Wait a minute; avoid repeatedly reloading or creating a keyboard on every render |
 | Finish leaves private data visible | Add a `finish` handler that clears application-owned data; await asynchronous cleanup |
 
 For a framework app, initialise the keyboard once when the component mounts and
-call `keyboard.close()` when it unmounts. Use `keyboard.finish()` to invalidate a
-pairing; `close()` only stops that SDK connection. Updated lifecycle methods
-require the new release.
+call `keyboard.close()` when it unmounts. `close()` ends the session for good and
+tells the phone to scan again; `keyboard.finish()` hands the screen to the next
+visitor with a fresh QR. Updated lifecycle methods require the new release.

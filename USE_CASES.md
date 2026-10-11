@@ -38,7 +38,16 @@ A TV web app shows a QR on its settings or pairing screen. Set `layout: 'remote'
 the phone shows a D-pad, Back, Home, Menu, volume, channel and the four colour
 keys. Keys arrive as standard key names (`ArrowDown`, `ChannelUp`, `ColorF0Red`);
 with `target`, as ordinary keyboard events the app may already handle. The
-`teletext` preset adds a number pad for page entry.
+separate `teletext` preset has the colour keys, a number pad and page and
+subpage keys.
+
+## Games with a menu
+
+A game needs a remote for its menu and a gamepad for play. Declare both with
+`layouts: { menu: 'remote', play: 'gamepad' }` and set `keyboard.context` as
+the game moves on; the phone switches at once, including when the screen
+changes on its own (game over). See
+[Switching layouts](DEVELOPER_GUIDE.md#switching-layouts-as-your-app-changes).
 
 ## Digital billboards
 
@@ -57,8 +66,10 @@ See the [billboard demos](examples/billboards/index.html).
 | Perform a few clear commands | Named `actions`; `action` handler |
 | Navigate menus, volume, channels | `layout: 'remote'`; `press` / `keydown` handlers |
 | Play a game | `layout: 'gamepad'` or your own keys; `keydown` / `keyup` handlers |
+| Different controls in different parts of your app | `layouts` and `context` |
 
 These are the supported interaction patterns. Multi-user rooms, local-only
-transport, desktop injection, trackpad/motion input, and sending information back
-to the phone are outside the current hosted phone keyboard. See the [quick start](QUICKSTART.md) to build
+transport, desktop injection, trackpad/motion input, and showing screen content
+on the phone are outside the current hosted phone keyboard: the screen only
+acknowledges input and names which of its declared layouts to show. See the [quick start](QUICKSTART.md) to build
 one of the supported patterns.

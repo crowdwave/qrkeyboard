@@ -15,17 +15,20 @@ handling. QRKeyboard does not ship firmware, bridges, or a USB-HID injector.
 - QR rendering as SVG, PNG, or a plain `0`/`1` bitmap grid.
 - Single-socket provisioning that returns a new code and owner token, plus a QR
   grid for PIN instances.
-- A hosted phone keyboard using live text, message entry, or named actions.
+- A hosted phone keyboard using live text, message entry, named actions, the
+  remote, teletext and gamepad presets, or custom layouts.
 - Endpoint AES-256-GCM encryption, directional HKDF keys, and optional SPAKE2 PIN
   pairing in the browser implementation.
 
 Provisioning and raw server QRs contain the join code alone, so the relay issues
 them only for PIN instances (`/provision?pin=1&protocol=3`, or `pinRequired: true`
 with `POST /i`). For no-PIN pairing the firmware generates the 32-byte key and
-draws its own QR of `joinUrl` + `&k=<base64url key>`; the relay never sees that
-key. Either way the firmware implements the pairing and framing (unchanged in protocol 3) as
-described in the [API reference](DEVELOPER_GUIDE.md#advanced-application-messages-and-compatibility):
-per-connection salts, SPAKE2 for PIN mode, counter nonces. The browser SDK
+draws its own QR of `joinUrl` + `&k=<base64url key>&h=<configuration hash>`; the
+relay never sees that key. Either way the firmware implements the pairing and
+framing described in the [API reference](DEVELOPER_GUIDE.md#advanced-application-messages-and-compatibility):
+per-connection salts, SPAKE2 for PIN mode (with the configuration hash in its
+transcript), counter nonces. The configuration hash is what lets the phone trust
+the screen name and controls the relay serves it. The browser SDK
 already does this for web screens.
 
 ## Hardware choices
@@ -54,7 +57,16 @@ implement endpoint pairing or end-to-end encryption.
    a new instance/key before showing the next QR.
 
 Send a `k` text message every 25 seconds to keep the connection warm; the relay
-answers it without waking the session. See the [API reference](DEVELOPER_GUIDE.md)
+answers it without waking the session. Reconnect as the device at
+`/s/<code>?role=device`.
+
+The device carries duties the browser SDK otherwise performs:
+
+- Limit PIN attempts yourself (the SDK allows five consecutive failures); the
+  relay does not count them.
+- Complete pairing within 12 seconds of the phone arriving, and acknowledge each
+  input within 8 seconds, or the phone reports a failure.
+- Layouts and names need `POST /i`; `/provision` sets only caps, PIN and protocol. See the [API reference](DEVELOPER_GUIDE.md)
 for wire formats and frame limits.
 
 ## Separate approaches you would have to build
