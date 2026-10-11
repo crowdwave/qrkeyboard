@@ -58,6 +58,7 @@ before then.
 | `caps` | `['keyboard']`, or `['keyboard', 'buttons']` with `actions` | Hosted inputs: `keyboard`, `buttons`. Ignored with `layout`/`layouts`, which set it from their blocks |
 | `actions` | none | 1 to 16 named actions: `{ id, label }` (each 1–60 characters, ids unique) or plain strings, whose id is their position (`'0'`, `'1'`, …) |
 | `pin` | none | `true` generates a 4-digit PIN shown under the QR; a string sets your own (the phone accepts up to 64 characters) |
+| `rejoinSeconds` | `300` | How long a phone that drops (locked, switched apps, lost signal) keeps the screen before another phone may join; 0 to 3600. `0` frees the screen the moment the phone drops. |
 | `region` | automatic | Optional relay placement hint: `wnam`, `enam`, `sam`, `weur`, `eeur`, `apac`, `oc`, `afr`, `me`; any other value is rejected |
 | `cellSize`, `margin` | `4`, `4` | QR rendering options |
 | `layout` | none | Phone controls: `'keyboard'`, `'buttons'`, `'remote'`, `'teletext'`, `'gamepad'`, or a list of blocks; see [Controls](#controls-remotes-keypads-and-game-buttons) |
@@ -242,7 +243,9 @@ session, so a new visitor can join straight away. Only one phone is accepted per
 session; a credential reconnect replaces its previous connection.
 
 If a phone that has joined drops without Disconnect (locked, switched apps, lost
-signal), only that phone may rejoin for 5 minutes. This applies even if it never
+signal), only that phone may rejoin for `rejoinSeconds` (default 5 minutes).
+With `rejoinSeconds: 0` the dropout loses control at once: the next phone to scan
+takes over, and the dropped phone's credential stops working. This applies even if it never
 finished pairing, because the relay cannot see pairing. The screen shows the
 `waiting` state meanwhile, and Finish ends the reservation at any time.
 
@@ -287,7 +290,7 @@ to anyone with the code, so put nothing private in names or labels.
 ### Create
 
 `POST /i` with JSON configuration (`caps`, `name`, `mode`, `submitLabel`, `actions`,
-`pinRequired`, `protocol`, `layout` or `layouts` with `context`, optional `region`) returns `code`, `joinUrl`,
+`pinRequired`, `protocol`, `layout` or `layouts` with `context`, `rejoinSeconds`, optional `region`) returns `code`, `joinUrl`,
 `ownerToken`, `qrUrl`, and the device-role `relay` URL. Any other top-level
 field is refused with 400 (fields inside layouts, keys and actions are not
 checked beyond the layout rules). Set `protocol: 3`; the hosted phone refuses
@@ -425,7 +428,7 @@ keys sorted at every level and no whitespace, truncated to 16 bytes, carried in
 the QR fragment as `h=<base64url>` after `c=` (and `k=` without a PIN). Hash the
 configuration exactly as the phone will receive it from `/j/<code>`: every
 field explicit (`caps`, `mode`, `name`, `submitLabel`, and `actions`,
-`pinRequired: true`, `protocol`, `layout` or `layouts` and `context` when used), without `region`.
+`pinRequired: true`, `protocol`, `layout` or `layouts` and `context`, `rejoinSeconds` when used), without `region`.
 
 Protocol 3 adds `layout`, `layouts` and `context`, the `down`/`up` and `context`
 messages, and the configuration hash.

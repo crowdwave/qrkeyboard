@@ -15,7 +15,7 @@ its reachability/version could not be verified during this documentation review.
 | Finish, old-link invalidation, and fresh visitor sessions | Implemented | Pending deployment |
 | Protocol 2: per-connection salts, counter nonces, replay rejection | Implemented | Pending deployment |
 | PIN attempts counted when pairing starts | Implemented | Pending deployment |
-| Dropped phone keeps its place for 5 minutes; Disconnect releases it | Implemented | Pending deployment |
+| Dropped phone keeps its place for `rejoinSeconds` (default 5 minutes, 0 to free it at once); Disconnect releases it | Implemented | Pending deployment |
 | Phone asks older screens to update | Implemented | Pending deployment |
 | Versioned SDK files with SRI (`/sdk/manifest.json`) | Implemented | Pending deployment |
 | Message-length budget shown while typing | Implemented | Pending deployment |

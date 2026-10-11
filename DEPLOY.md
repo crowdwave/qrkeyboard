@@ -72,7 +72,7 @@ variables or API secrets.
 | Phone cannot open the computer's localhost | Scan the generated QR; do not type the local development URL into the phone |
 | Connected but no text on screen | Live mode needs a `key` handler; message mode needs a `text` handler |
 | Named actions or message mode do nothing | Check whether the updated hosted service has been released |
-| Phone says the screen is in use | Disconnect or Finish on the existing phone. A phone that dropped keeps its place for 5 minutes; `finish()` on the screen clears it at once |
+| Phone says the screen is in use | Disconnect or Finish on the existing phone. A phone that dropped keeps its place for `rejoinSeconds` (default 5 minutes; set `0` to free it at once); `finish()` on the screen clears it |
 | Creating sessions is rate-limited | Wait a minute; avoid repeatedly reloading or creating a keyboard on every render |
 | Finish leaves private data visible | Add a `finish` handler that clears application-owned data; await asynchronous cleanup |
 
